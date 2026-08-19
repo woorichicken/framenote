@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>framenote</title>
+<style>
+  :root{--bg:#131417;--panel:#1b1d22;--panel2:#212429;--line:#2c2f37;--ink:#e9ebef;
+        --ink2:#a8aeb9;--ink3:#6e7480;--accent:#3b82f6;--open:#f0a62e;--ok:#34c77b;--bad:#e5766b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"Apple SD Gothic Neo",system-ui,sans-serif}
+  .bar{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid var(--line);
+       background:var(--panel2);font-family:ui-monospace,SFMono-Regular,monospace;font-size:12px;color:var(--ink3);flex-wrap:wrap}
+  .bar .f{color:var(--ink)}
+  .bar .spacer{flex:1}
+  .work{color:var(--open)}
+  .body{display:grid;grid-template-columns:minmax(0,1fr) 300px;height:calc(100vh - 37px)}
+  @media(max-width:900px){.body{grid-template-columns:1fr}}
+  .left{min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+  .stage{position:relative;background:#000;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  video{max-width:100%;max-height:100%;display:block}
+  .draw{position:absolute;inset:0;cursor:crosshair}
+  .rect{position:absolute;border:1.5px solid var(--accent);background:rgba(59,130,246,.16);border-radius:2px}
+  .rect.mark{border-color:var(--open);background:rgba(240,166,46,.13);cursor:pointer}
+  .rect.mark.applied{border-color:var(--ok);background:rgba(52,199,123,.12)}
+  .rect .tag{position:absolute;top:-9px;left:-1px;font:600 10px ui-monospace,monospace;
+             background:var(--open);color:#131417;padding:0 5px;border-radius:3px}
+  .lock{position:absolute;inset:0;display:grid;place-items:center;background:rgba(11,13,17,.85);
+        text-align:center;padding:24px;font-size:13px;color:var(--ink2)}
+  .transport{padding:10px 12px;border-top:1px solid var(--line)}
+  .tline{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  button{font:inherit;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+         border-radius:5px;padding:5px 10px;cursor:pointer}
+  button:hover{border-color:var(--ink3)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .tc{font:16px ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .tc small{font-size:11px;color:var(--ink3);margin-left:8px}
+  .scrub{position:relative;height:30px;cursor:pointer;user-select:none}
+  .segs{position:absolute;inset:0 0 12px;display:flex;gap:2px}
+  .seg{background:var(--line);border-radius:3px;display:grid;place-items:center;
+       font:9.5px ui-monospace,monospace;color:var(--ink3);overflow:hidden;position:relative}
+  .seg.on{background:rgba(59,130,246,.22);color:var(--accent)}
+  .sel{position:absolute;top:0;bottom:12px;background:rgba(59,130,246,.28);border-left:1px solid var(--accent);
+       border-right:1px solid var(--accent);pointer-events:none}
+  .head{position:absolute;top:0;bottom:8px;width:2px;background:var(--ink);pointer-events:none}
+  .rail{display:flex;flex-direction:column;min-width:0}
+  .rh{padding:8px 12px;border-bottom:1px solid var(--line);font:10.5px ui-monospace,monospace;
+      letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);display:flex;justify-content:space-between}
+  .notes{flex:1;overflow-y:auto}
+  .note{padding:10px 12px;border-bottom:1px solid #24272e;cursor:pointer;border-left:2px solid transparent}
+  .note:hover{background:var(--panel2)}
+  .note.cur{background:var(--panel2);border-left-color:var(--accent)}
+  .nr{display:flex;align-items:center;gap:6px;font:10.5px ui-monospace,monospace;color:var(--ink3)}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ink3)}
+  .dot.draft{background:var(--ink3)}.dot.sent{background:var(--accent)}.dot.working{background:var(--open)}
+  .dot.applied{background:var(--ok)}.dot.failed{background:var(--bad)}.dot.stale{background:#8b5cf6}
+  .dot.closed{background:#3f434c}
+  .nw{font-size:13px;margin-top:3px}
+  .nt{font-size:12px;color:var(--ink2)}.nt:before{content:"→ ";color:var(--accent)}
+  .nf{font-size:11px;color:var(--bad);margin-top:2px}
+  .thumbs{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+  .thumbs img{width:44px;height:28px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}
+  .rf{padding:8px 12px;border-top:1px solid var(--line);display:flex;gap:6px}
+  .composer{position:absolute;right:12px;top:12px;width:290px;background:var(--panel);
+            border:1px solid var(--line);border-radius:8px;padding:12px;z-index:5;display:none;
+            box-shadow:0 18px 40px -18px rgba(0,0,0,.9)}
+  .composer.on{display:block}
+  .coord{font:11px ui-monospace,monospace;color:var(--accent);padding-bottom:8px;margin-bottom:10px;
+         border-bottom:1px solid #24272e;line-height:1.7}
+  .coord span{color:var(--ink3)}
+  label{display:block;font:10px ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--ink3);margin-bottom:4px}
+  input[type=text]{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);
+                   border-radius:5px;padding:6px 8px;font:inherit;margin-bottom:9px}
+  input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .msg{font-size:12px;padding:6px 8px;border-radius:5px;margin-bottom:8px;display:none}
+  .msg.on{display:block}
+  .msg.err{background:rgba(229,118,107,.14);color:var(--bad)}
+  .msg.ok{background:rgba(52,199,123,.12);color:var(--ok)}
+  .hint{font-size:11px;color:var(--ink3);margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="f" id="file">—</span><span>·</span><span id="render">—</span><span>·</span><span id="spec">—</span>
+  <span>·</span><span id="kind">—</span>
+  <span class="spacer"></span>
+  <span class="work" id="work"></span>
+</div>
+<div class="body">
+  <div class="left">
+    <div class="stage" id="stage">
+      <video id="v" preload="auto"></video>
+      <div class="draw" id="draw"></div>
+      <div class="lock" id="lock" style="display:none"></div>
+      <div class="composer" id="composer">
+        <div class="coord" id="coord"></div>
+        <div class="msg" id="cmsg"></div>
+        <label for="what">무엇이</label>
+        <input type="text" id="what" placeholder="자막이 안전영역 아래로 나감">
+        <label for="want">어떻게 <span style="text-transform:none;letter-spacing:0">— 비워도 됩니다</span></label>
+        <input type="text" id="want" placeholder="하단 100px 안으로">
+        <div class="hint" id="pastehint">Cmd/Ctrl+V 로 이미지를 붙일 수 있습니다</div>
+        <div style="display:flex;gap:6px">
+          <button class="primary" id="save" style="flex:1">저장</button>
+          <button id="cancel">취소</button>
+        </div>
+      </div>
+    </div>
+    <div class="transport">
+      <div class="tline">
+        <button id="play">▶</button>
+        <span class="tc"><span id="tct">00:00.00</span><small id="fr">f0</small></span>
+        <span class="spacer" style="flex:1"></span>
+        <span id="selinfo" style="font:11px ui-monospace,monospace;color:var(--ink3)"></span>
+      </div>
+      <div class="scrub" id="scrub">
+        <div class="segs" id="segs"></div>
+        <div class="sel" id="selbox" style="display:none"></div>
+        <div class="head" id="head" style="left:0"></div>
+      </div>
+    </div>
+  </div>
+  <div class="rail">
+    <div class="rh"><span>메모</span><span id="counts"></span></div>
+    <div class="notes" id="list"></div>
+    <div class="rf">
+      <button class="primary" id="send" style="flex:1">에이전트에게 보내기</button>
+      <button id="copy">복사</button>
+    </div>
+  </div>
+</div>
+<script src="/player.js"></script>
+<script>if(new URLSearchParams(location.search).has("verify")){const s=document.createElement("script");s.src="/verify.js";document.body.appendChild(s);}</script>
+</body>
+</html>

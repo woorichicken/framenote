@@ -15,6 +15,7 @@
   "files": [
     "bin",
     "dist",
+    "player",
     "LICENSE"
   ],
   "main": "./dist/index.js",
@@ -33,7 +34,8 @@
     "test:watch": "vitest",
     "ruler": "node scripts/make-ruler-video.mjs",
     "all": "pnpm typecheck && pnpm test && pnpm build",
-    "verify:frames": "node scripts/verify-ruler.mjs"
+    "verify:frames": "node scripts/verify-frames.mjs",
+    "verify:ruler": "node scripts/verify-ruler.mjs"
   },
   "dependencies": {},
   "devDependencies": {

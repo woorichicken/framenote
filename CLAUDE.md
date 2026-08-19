@@ -23,9 +23,14 @@ pnpm all        # typecheck + test + build. 커밋 전 이것 하나만 통과�
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm ruler          # 프레임 눈금 영상 생성 (프레임 정확도 TC 의 전제)
-pnpm verify:frames  # 그 눈금이 진짜 맞는지 되읽어 확인 — 로컬 전용
+pnpm ruler          # 프레임 눈금 영상 생성
+pnpm verify:ruler   # 그 눈금 영상이 맞는지 되읽어 확인 — 로컬 전용
+pnpm verify:frames  # 플레이어가 그 눈금을 제대로 읽는지 브라우저에서 확인 — 로컬 전용
 ```
+
+검증이 **둘로 나뉜 이유**: `verify:ruler` 는 눈금 영상 자체를, `verify:frames` 는 플레이어를 본다.
+눈금이 맞아도 플레이어가 프레임을 잘못 세면 소용없고, 플레이어가 맞아도 눈금이 틀리면
+검증이 거짓말을 한다. `verify:frames` 는 agent-browser 가 필요하다.
 
 CI 는 typecheck·test·build 만 돈다. 프레임 검사는 ffmpeg 가 필요해서 **로컬에서 돌린다.**
 

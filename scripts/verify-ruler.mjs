@@ -62,7 +62,9 @@ const GLYPH_KEYS = new Map(Object.entries(FONT).map(([d, rows]) => [rows.join(""
 
 /** 번호를 모르는 상태로 읽는다. 자릿수를 1~4 로 시도해 모든 칸이 글리프와 맞는 것만 채택한다. */
 function decodeFrameNumber(gray, width, height) {
-  for (let len = 1; len <= 4; len++) {
+  // 긴 자릿수부터 본다. 1자리 배치가 3자리 라벨의 **가운데 숫자**와 같은 자리라
+  // 짧은 쪽부터 보면 100 을 0 으로 읽는다(실측 2026-08-19).
+  for (let len = 4; len >= 1; len--) {
     const { scale, digitW, startX, startY } = layout("0".repeat(len), width, height);
     let out = "";
     let ok = true;
@@ -81,7 +83,7 @@ function decodeFrameNumber(gray, width, height) {
 async function main() {
   assertFontShape();
   const opt = parseArgs(process.argv.slice(2));
-  if (!process.argv.includes("--frames")) opt.frames = 90;
+  if (!process.argv.includes("--frames")) opt.frames = 320;
   if (!process.argv.includes("--width")) opt.width = 480;
   if (!process.argv.includes("--height")) opt.height = 270;
 
@@ -91,9 +93,20 @@ async function main() {
     await makeRulerVideo({ ...opt, out: file });
 
     // 첫·마지막·키프레임·키프레임 아닌 자리·자릿수가 바뀌는 자리를 고루 본다.
-    const targets = [...new Set([
-      0, 1, 9, 10, opt.gop, opt.gop + 1, 47, 63, opt.frames - 2, opt.frames - 1,
-    ])].filter((n) => n >= 0 && n < opt.frames).sort((a, b) => a - b);
+    // 자릿수가 바뀌는 자리(9→10, 99→100)를 반드시 넣는다. 2자리만 보면 3자리 오독을 못 잡는다.
+    const wanted = [...new Set([
+      0, 1, 9, 10, opt.gop, opt.gop + 1, 47, 99, 100, 151, opt.frames - 2, opt.frames - 1,
+    ])];
+    const targets = wanted.filter((n) => n >= 0 && n < opt.frames).sort((a, b) => a - b);
+    const dropped = wanted.length - targets.length;
+    if (dropped > 0) {
+      // 조용히 줄어들면 "9/9 일치" 가 실제보다 많은 것을 본 것처럼 읽힌다.
+      console.log(`  (영상이 ${opt.frames} 프레임이라 대상 ${dropped} 개가 빠졌습니다)`);
+    }
+    if (!targets.some((n) => n >= 100)) {
+      console.error("세 자리 프레임을 하나도 검사하지 못했습니다 — 영상을 100 프레임 이상으로 만드세요.");
+      process.exit(1);
+    }
 
     let bad = 0;
     for (const n of targets) {
