@@ -28,6 +28,18 @@ jobs:
           set -e
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
+
+          # 패키지가 npm 에 아예 없으면 **OIDC 로는 첫 배포를 못 한다** — npm 이 패키지가 있어야
+          # Trusted Publisher 등록을 허용한다. 여기서 빨간불을 내면 첫 배포 전까지 모든 푸시가
+          # 빨개지고, 그러면 진짜 실패를 무시하게 된다. 무엇을 해야 하는지 적고 통과시킨다.
+          if ! npm view "$name" version >/dev/null 2>&1; then
+            echo "::notice::$name 이 npm 에 아직 없습니다. 첫 배포는 사람이 한 번 해야 합니다."
+            echo "  1) npm login && npm publish --access public"
+            echo "  2) npmjs.com → $name → Settings → Trusted publishing 에 이 저장소와 release.yml 등록"
+            echo "  3) 그다음부터는 버전만 올려 머지하면 여기서 자동으로 올라갑니다."
+            exit 0
+          fi
+
           # 버전을 안 올린 머지(문서·CI 수정)가 실패하지 않게 한다.
           if npm view "$name@$version" version >/dev/null 2>&1; then
             echo "$name@$version 은 이미 있습니다. 건너뜁니다."
