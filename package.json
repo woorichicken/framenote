@@ -35,7 +35,8 @@
     "ruler": "node scripts/make-ruler-video.mjs",
     "all": "pnpm typecheck && pnpm test && pnpm build",
     "verify:frames": "node scripts/verify-frames.mjs",
-    "verify:ruler": "node scripts/verify-ruler.mjs"
+    "verify:ruler": "node scripts/verify-ruler.mjs",
+    "release:check": "node scripts/check-release-contract.mjs"
   },
   "dependencies": {},
   "devDependencies": {

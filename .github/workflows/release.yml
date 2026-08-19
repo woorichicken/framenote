@@ -37,6 +37,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # 배포 전에 CI 와 같은 게이트를 다시 본다. 여기서 막히면 npm 에 안 올라간다.
+      - run: pnpm release:check
       - run: pnpm typecheck && pnpm test && pnpm build
       - name: 아직 없는 버전만 배포한다
         run: |
