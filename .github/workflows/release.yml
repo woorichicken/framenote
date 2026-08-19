@@ -1,0 +1,36 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write # npm Trusted Publishing(OIDC). 빠지면 인증이 통째로 안 된다
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 배포 전에 CI 와 같은 게이트를 다시 본다. 여기서 막히면 npm 에 안 올라간다.
+      - run: pnpm typecheck && pnpm test && pnpm build
+      - name: 아직 없는 버전만 배포한다
+        run: |
+          set -e
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          # 버전을 안 올린 머지(문서·CI 수정)가 실패하지 않게 한다.
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version 은 이미 있습니다. 건너뜁니다."
+            exit 0
+          fi
+          npm publish --access public

@@ -71,3 +71,23 @@ rawvideo 로 파이프하므로 어느 ffmpeg 빌드에서도 돈다.
 
 글리프를 의도적으로 바꾸려면 **눈으로 다시 확인하고** 해시를 갱신한다. 해시만 갱신하면
 그 테스트는 아무것도 안 지킨다.
+
+
+## 배포
+
+`main` 에 버전이 오른 커밋이 머지되면 `release` 워크플로가 배포한다. 이미 npm 에 있는 버전은
+건너뛰므로 버전을 안 올린 머지(문서·CI 수정)는 아무것도 배포하지 않는다.
+
+### 첫 배포만 예외다 (실측 2026-08-19)
+
+**OIDC(Trusted Publishing)로는 첫 배포를 할 수 없다.** npm 이 "패키지가 이미 있어야"
+Trusted Publisher 를 등록하게 해서, 존재하지 않는 패키지에는 미리 걸어둘 수 없다.
+그래서 순서가 이렇다:
+
+1. 사람이 로컬에서 한 번 올린다 — `npm login` 후 `npm publish --access public`
+2. npmjs.com → 그 패키지 → Settings → Trusted publishing 에 등록한다
+   (organization/user, repository, workflow 파일명 = `release.yml`)
+3. 그다음부터는 버전만 올려 머지하면 워크플로가 알아서 올린다
+
+이 셋을 모르면 워크플로가 인증에서 막히는데, **npm 은 미인증 publish 에 401 이 아니라 404 를
+준다.** "패키지를 못 찾겠다"로 읽혀서 원인을 엉뚱한 데서 찾게 된다.
