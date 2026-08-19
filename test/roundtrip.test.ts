@@ -33,6 +33,17 @@ const makeRuler = (out: string, frames: number): void => {
 };
 
 beforeAll(async () => {
+  // ffmpeg 가 없으면 **건너뛰지 않고 실패한다.** 조용히 건너뛰면 13개가 빠진 초록이 되고,
+  // 그 초록은 실제보다 많은 것을 본 것처럼 읽힌다(실측 2026-08-19: CI 에 ffmpeg 가 없었다).
+  try {
+    execFileSync("ffmpeg", ["-version"], { stdio: "ignore" });
+    execFileSync("ffprobe", ["-version"], { stdio: "ignore" });
+  } catch {
+    throw new Error(
+      "ffmpeg/ffprobe 가 없어 왕복 테스트를 돌릴 수 없습니다. " +
+        "이 테스트는 mock 을 쓰지 않는 것이 목적이라 건너뛰지 않습니다. (brew install ffmpeg)",
+    );
+  }
   dir = mkdtempSync(join(tmpdir(), "framenote-rt-"));
   video = join(dir, "out", "final.mp4");
   video2 = join(dir, "out", "preview.mp4");

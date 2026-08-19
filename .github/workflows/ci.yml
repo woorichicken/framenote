@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # 왕복 테스트가 실제 영상을 만들고 규격을 읽는다. mock 을 쓰지 않는 게 이 테스트의 전부라
+      # ffmpeg 없이는 돌 수 없다. 없으면 조용히 건너뛰지 않고 실패한다(아래 테스트의 가드).
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -19,3 +22,5 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # 눈금 영상이 맞는지도 여기서 본다. 브라우저가 필요한 프레임 정확도 검사만 로컬 전용이다.
+      - run: pnpm verify:ruler
