@@ -256,6 +256,31 @@ window.addEventListener("mouseup", () => {
   openComposer();
 });
 
+// "어떻게" 가 비면 **구간을 잡고 이미지를 붙이도록 유도한다.**
+// 말로 못 하는 지적("그냥 이상해")은 정당하고, 그럴수록 에이전트가 판단할 근거는 구간과
+// 그림뿐이다. 채우라고 막는 게 아니라 다른 근거를 대게 한다.
+function updateWantNudge() {
+  const el = $("pastehint");
+  if (pendingImages.length > 0) {
+    el.textContent = `이미지 ${pendingImages.length}장 첨부됨`;
+    el.style.color = "";
+    return;
+  }
+  const wantEmpty = $("want").value.trim() === "";
+  const r = selection ?? [frame, frame];
+  const isPoint = r[0] === r[1];
+  if (!wantEmpty) {
+    el.textContent = "Cmd/Ctrl+V 로 이미지를 붙일 수 있습니다";
+    el.style.color = "";
+    return;
+  }
+  el.style.color = "var(--open)";
+  el.textContent = isPoint
+    ? "어떻게가 비었습니다 — 스크러버를 끌어 구간을 잡거나 화면을 붙이면 에이전트가 판단할 수 있습니다"
+    : "어떻게가 비었습니다 — 화면을 붙이면 에이전트가 판단할 근거가 늘어납니다";
+}
+$("want").addEventListener("input", updateWantNudge);
+
 function openComposer() {
   const r = selection ?? [frame, frame];
   $("coord").innerHTML =
@@ -263,7 +288,7 @@ function openComposer() {
     (sceneAt(r[0]) ? `<span>씬</span> ${sceneAt(r[0])}<br>` : "") +
     (pending ? `<span>네모</span> [${[pending.x0, pending.y0, pending.x1, pending.y1].map((n) => n.toFixed(2)).join(", ")}] @f${pendingFrame}` : `<span>네모 없음</span>`);
   $("what").value = ""; $("want").value = ""; pendingImages = [];
-  $("pastehint").textContent = "Cmd/Ctrl+V 로 이미지를 붙일 수 있습니다";
+  updateWantNudge();
   msg("", "");
   $("composer").classList.add("on");
   $("what").focus();
@@ -300,7 +325,7 @@ function addImage(file) {
   if (pendingImages.length >= 10) { msg("이미지는 메모당 10장까지입니다.", "err"); return; }
   if (file.size > 20 * 1024 * 1024) { msg(`${file.name || "이미지"} 가 20MB를 넘습니다.`, "err"); return; }
   pendingImages.push(file);
-  $("pastehint").textContent = `이미지 ${pendingImages.length}장 첨부됨`;
+  updateWantNudge();
 }
 
 $("save").onclick = async () => {
