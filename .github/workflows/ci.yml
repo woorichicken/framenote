@@ -43,3 +43,6 @@ jobs:
       - run: pnpm build
       # 눈금 영상이 맞는지도 여기서 본다. 브라우저가 필요한 프레임 정확도 검사만 로컬 전용이다.
       - run: pnpm verify:ruler
+      # 화면 조작 회귀. 사람이 한 번 눌러본 것은 다음 커밋에서 깨져도 아무도 모른다.
+      - run: npx playwright install --with-deps chromium
+      - run: pnpm test:e2e

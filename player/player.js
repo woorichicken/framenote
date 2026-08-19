@@ -11,6 +11,7 @@ let INFO = null;
 let notes = [];
 let frame = 0;
 let selection = null;      // 스크러버로 잡은 구간 [from, to]
+let selectionFromUser = false; // 사람이 스크러버로 잡았나(자동 생성과 구분한다)
 let pending = null;        // 작성 중인 네모
 let pendingFrame = null;
 let current = null;        // 목록에서 고른 메모 id
@@ -134,9 +135,67 @@ function paintMarks() {
     d.style.width = ((n.rect.x1 - n.rect.x0) * rectOf.width) + "px";
     d.style.height = ((n.rect.y1 - n.rect.y0) * rectOf.height) + "px";
     d.innerHTML = `<span class="tag">${n.id.slice(0, 4)}</span>`;
-    d.onclick = (e) => { e.stopPropagation(); selectNote(n.id); };
     box.appendChild(d);
   }
+}
+
+
+/** 상태별로 카드에 뜨는 동작. 문서의 상태 지도에 있는 전이만 노출한다. */
+function actionsFor(n) {
+  const patch = (body) => api(`/api/notes/${n.id}`, {
+    method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+  });
+  const acts = [];
+  if (n.status === "applied") {
+    acts.push(["해결됨", () => patch({ status: "closed" })]);
+    acts.push(["다시 열기", () => patch({ status: "sent" })]);
+  }
+  if (n.status === "stale") {
+    // 다시 찍음은 구간·좌표를 새로 잡아야 하므로 편집 모드로 들어간다.
+    acts.push(["다시 찍음", async () => { await startRetake(n); }]);
+    acts.push(["버림", () => patch({ status: "closed" })]);
+  }
+  if (n.status === "failed") {
+    acts.push(["다시 보내기", () => api(`/api/notes/${n.id}/resend`, { method: "POST" })]);
+  }
+  if (n.status !== "closed") {
+    acts.push(["수정", async () => { await startEdit(n); }]);
+    acts.push(["삭제", () => api(`/api/notes/${n.id}`, { method: "DELETE" })]);
+  }
+  return acts;
+}
+
+let editing = null;   // 지금 고치는 중인 메모
+
+/** 기존 메모를 작성창에 펼쳐 고친다. 작업중이면 먼저 경고한다. */
+async function startEdit(n) {
+  if (n.status === "working") {
+    const go = confirm(
+      "에이전트가 이 메모로 작업 중입니다. 지금 고치면 그 작업이 취소되고 초안으로 돌아갑니다. 계속할까요?",
+    );
+    if (!go) return;
+  }
+  editing = n;
+  await selectNote(n.id);
+  pending = n.rect; pendingFrame = n.rectFrame;
+  setSelection(n.range.slice(), true);
+  openComposer();
+  $("what").value = n.what;
+  $("want").value = n.want ?? "";
+  updateWantNudge();
+}
+
+/** 낡은 메모를 새 렌더본에서 다시 찍는다. 글과 이미지는 그대로 두고 좌표만 새로 잡는다. */
+async function startRetake(n) {
+  editing = n;
+  await selectNote(n.id);
+  pending = null; pendingFrame = null;
+  selection = null; selectionFromUser = false;
+  $("selbox").style.display = "none";
+  openComposer();
+  $("what").value = n.what;
+  $("want").value = n.want ?? "";
+  msg("새 렌더본에서 구간과 네모를 다시 잡으세요.", "ok");
 }
 
 const KO = { draft: "초안", sent: "보냄", working: "작업중", applied: "반영됨",
@@ -159,6 +218,18 @@ function paintNotes() {
     if (n.want) el.querySelector(".nt").textContent = n.want;
     if (n.failureReason) el.querySelector(".nf").textContent = n.failureReason;
     el.onclick = () => selectNote(n.id);
+
+    const acts = document.createElement("div");
+    acts.className = "acts";
+    for (const [label, run] of actionsFor(n)) {
+      const b = document.createElement("button");
+      b.className = "act";
+      b.textContent = label;
+      b.dataset.act = label;
+      b.onclick = async (e) => { e.stopPropagation(); await run(); await refresh(); };
+      acts.appendChild(b);
+    }
+    if (acts.children.length) el.appendChild(acts);
     box.appendChild(el);
   }
   const working = notes.filter((n) => n.status === "working");
@@ -197,8 +268,9 @@ window.addEventListener("mouseup", (e) => {
   if (Math.abs(now - scrubStart) <= 2) setSelection([scrubStart, scrubStart]);
   scrubStart = null;
 });
-function setSelection(range) {
+function setSelection(range, byUser = true) {
   selection = range;
+  selectionFromUser = byUser;
   const total = INFO.info.totalFrames;
   const box = $("selbox");
   box.style.display = "block";
@@ -214,18 +286,39 @@ v.addEventListener("timeupdate", () => {
 });
 
 $("play").onclick = () => { if (v.paused) { v.play(); $("play").textContent = "❚❚"; } else { v.pause(); $("play").textContent = "▶"; } };
-document.addEventListener("keydown", async (e) => {
+// 한 칸 이동은 목표를 **누적**한다. 앞 이동이 끝나기 전에 또 누르면 그 사이의 누름이
+// 삼켜져서, 다섯 번 눌러도 두 칸만 가는 일이 생긴다(실측 2026-08-19).
+let stepTarget = null, stepping = false;
+async function stepBy(delta) {
+  const base = stepTarget === null ? frame : stepTarget;
+  stepTarget = Math.max(0, Math.min(INFO.info.totalFrames - 1, base + delta));
+  if (stepping) return;
+  stepping = true;
+  try {
+    // 루프 안에서 목표를 비우지 않는다. 비우면 그 사이에 누른 것이 낡은 frame 을 기준으로
+    // 다시 계산돼 한두 칸이 삼켜진다(실측 2026-08-19: 다섯 번 눌렀는데 두 칸).
+    let done = null;
+    while (stepTarget !== done) {
+      done = stepTarget;
+      await seekToFrame(done);
+    }
+  } finally { stepping = false; stepTarget = null; }
+}
+document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;
-  if (e.key === "ArrowRight") { v.pause(); await seekToFrame(frame + (e.shiftKey ? 30 : 1)); e.preventDefault(); }
-  if (e.key === "ArrowLeft") { v.pause(); await seekToFrame(frame - (e.shiftKey ? 30 : 1)); e.preventDefault(); }
+  if (e.key === "ArrowRight") { v.pause(); void stepBy(e.shiftKey ? 30 : 1); e.preventDefault(); }
+  if (e.key === "ArrowLeft") { v.pause(); void stepBy(e.shiftKey ? -30 : -1); e.preventDefault(); }
   if (e.key === " ") { $("play").click(); e.preventDefault(); }
 });
 
 // ── 네모 그리기 → 작성 ─────────────────────────────────────
 const draw = $("draw");
-let dragging = false, sx = 0, sy = 0, live = null;
+let dragging = false, sx = 0, sy = 0, live = null, startedOnMark = null;
 draw.addEventListener("mousedown", (e) => {
-  if (INFO.locked || e.target.closest(".composer") || e.target.closest(".rect.mark")) return;
+  if (INFO.locked || e.target.closest(".composer")) return;
+  // 마커 위에서도 끌 수 있어야 한다. 누른 시점에 막으면 마커가 덮은 자리는 영영 새 메모를
+  // 못 만든다(실측 2026-08-19). 움직였으면 그리기, 안 움직였으면 그 메모 선택으로 가른다.
+  startedOnMark = e.target.closest(".rect.mark");
   const b = v.getBoundingClientRect();
   if (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) return;
   v.pause(); dragging = true;
@@ -248,11 +341,22 @@ window.addEventListener("mouseup", () => {
   if (!dragging) return;
   dragging = false;
   if (!pending || pending.x1 - pending.x0 < 0.02 || pending.y1 - pending.y0 < 0.02) {
-    pending = null; live?.remove(); return;
+    pending = null; live?.remove();
+    // 마커 위에서 안 움직였으면 클릭이다 — 그 메모를 고른다.
+    if (startedOnMark) {
+      const tag = startedOnMark.querySelector(".tag")?.textContent;
+      const hit = notes.find((n) => n.id.startsWith(tag ?? "\u0000"));
+      if (hit) void selectNote(hit.id);
+    }
+    startedOnMark = null;
+    return;
   }
+  startedOnMark = null;
   pendingFrame = frame;
   // 네모만 그려 시작한 메모는 구간이 지금 프레임 하나로 채워진다. 비워 두지 않는다.
-  if (!selection) setSelection([frame, frame]);
+  // **사람이 잡은 게 아니라고 표시한다** — 안 그러면 저장 뒤에도 남아서 다음 메모가
+  // 그 프레임을 물려받는다(실측 2026-08-19: 두 번째 메모가 첫 메모의 프레임으로 저장됐다).
+  if (!selection) setSelection([frame, frame], false);
   openComposer();
 });
 
@@ -287,15 +391,24 @@ function openComposer() {
     `<span>구간</span> f${r[0]}${r[0] === r[1] ? "" : "–" + r[1]} <span>· ${tc(r[0])}</span><br>` +
     (sceneAt(r[0]) ? `<span>씬</span> ${sceneAt(r[0])}<br>` : "") +
     (pending ? `<span>네모</span> [${[pending.x0, pending.y0, pending.x1, pending.y1].map((n) => n.toFixed(2)).join(", ")}] @f${pendingFrame}` : `<span>네모 없음</span>`);
-  $("what").value = ""; $("want").value = ""; pendingImages = [];
+  // 고치는 중이면 쓰던 내용을 지우지 않는다. 네모를 다시 끌면 이 함수가 또 불리는데,
+  // 여기서 비우면 저장이 "무엇이 비었다"로 조용히 멈춘다(실측 2026-08-19).
+  if (!editing) { $("what").value = ""; $("want").value = ""; pendingImages = []; }
   updateWantNudge();
   msg("", "");
   $("composer").classList.add("on");
   $("what").focus();
 }
 function closeComposer() {
+  editing = null;
   $("composer").classList.remove("on");
   pending = null; pendingFrame = null; pendingImages = [];
+  // 자동으로 만든 구간은 이 메모의 것이다. 남겨두면 다음 메모가 물려받는다.
+  if (!selectionFromUser) {
+    selection = null;
+    $("selbox").style.display = "none";
+    $("selinfo").textContent = "";
+  }
   [...draw.querySelectorAll(".rect:not(.mark)")].forEach((e) => e.remove());
 }
 function msg(text, kind) {
@@ -333,6 +446,17 @@ $("save").onclick = async () => {
   if (!what) { msg("무엇이 칸을 채워야 합니다.", "err"); $("what").focus(); return; }
   try {
     const r = selection ?? [frame, frame];
+    if (editing) {
+      // 고치는 중이면 새 메모를 만들지 않는다. 같은 식별자로 남아 이력이 이어진다.
+      await api(`/api/notes/${editing.id}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ range: r, rect: pending, rectFrame: pendingFrame, what, want: $("want").value }),
+      });
+      editing = null;
+      closeComposer();
+      await refresh();
+      return;
+    }
     const note = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: r, rect: pending, rectFrame: pendingFrame, what, want: $("want").value }),

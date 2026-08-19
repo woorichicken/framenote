@@ -216,6 +216,11 @@ export async function startServer(opts: {
           next.status = "draft";
           next.render = state.info.render;
         }
+        // 다시 열기: 지금 보고 있는 렌더본 기준으로 되살아나 다음 묶음에 들어간다.
+        if (found.status === "applied" && body.status === "sent") {
+          next.render = state.info.render;
+          next.batch = null;
+        }
         save(all.map((n) => (n.id === id ? next : n)));
         pushSse({ type: "notes-changed" });
         return json(res, 200, next);
@@ -264,6 +269,22 @@ export async function startServer(opts: {
       res.writeHead(200, { "content-length": statSync(file).size });
       createReadStream(file).pipe(res);
       return;
+    }
+
+    const resendMatch = /^\/api\/notes\/([A-Za-z0-9]+)\/resend$/.exec(path);
+    if (resendMatch && req.method === "POST") {
+      const id = resendMatch[1]!;
+      const all = notes();
+      const found = all.find((n) => n.id === id);
+      if (!found) return json(res, 404, { error: "그런 메모가 없습니다." });
+      // 그 메모만 즉시 새 묶음으로 나간다. 대기 중인 초안은 딸려 나가지 않는다.
+      const batch = shortId(6);
+      save(all.map((n) => (n.id === id
+        ? { ...n, status: "sent" as const, batch, failureReason: null, render: state.info.render }
+        : n)));
+      hub.broadcast({ type: "batch", batch, count: 1 });
+      pushSse({ type: "notes-changed" });
+      return json(res, 200, { batch, count: 1 });
     }
 
     if (path === "/api/send" && req.method === "POST") {
@@ -367,6 +388,10 @@ export async function startServer(opts: {
       for (const res of sse) { try { res.end(); } catch { /* 이미 닫힘 */ } }
       sse.clear();
       unregisterServer(storeRoot, process.pid);
+      // 살아 있는 연결을 끊지 않으면 close 가 끝나지 않는다. 브라우저의 EventSource 는
+      // 끊기면 2초 뒤 다시 붙어서, 닫는 동안 새 연결이 계속 생긴다(실측 2026-08-19:
+      // 테스트 정리가 60초 타임아웃까지 매달렸다). Ctrl-C 도 같은 이유로 안 끝난다.
+      server.closeAllConnections();
       await new Promise<void>((r) => server.close(() => r()));
     },
   };
