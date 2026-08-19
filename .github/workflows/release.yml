@@ -11,9 +11,17 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: ffmpeg 준비
+        timeout-minutes: 5
+        run: |
+          if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
+            echo "이미 있습니다: $(ffmpeg -version | head -1)"
+          else
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

@@ -8,11 +8,22 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       # 왕복 테스트가 실제 영상을 만들고 규격을 읽는다. mock 을 쓰지 않는 게 이 테스트의 전부라
       # ffmpeg 없이는 돌 수 없다. 없으면 조용히 건너뛰지 않고 실패한다(아래 테스트의 가드).
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      #
+      # **이미 있으면 설치하지 않는다.** 러너 이미지에 대체로 들어 있고, apt 는 종종 몇 분씩
+      # 멈춘다(실측 2026-08-19: 두 실행이 이 한 줄에서 13분 넘게 걸렸다).
+      - name: ffmpeg 준비
+        timeout-minutes: 5
+        run: |
+          if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
+            echo "이미 있습니다: $(ffmpeg -version | head -1)"
+          else
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
