@@ -23,8 +23,13 @@ pnpm all        # typecheck + test + build. 커밋 전 이것 하나만 통과�
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm ruler      # 프레임 눈금 영상 생성 (프레임 정확도 TC 의 전제)
+pnpm ruler          # 프레임 눈금 영상 생성 (프레임 정확도 TC 의 전제)
+pnpm verify:frames  # 그 눈금이 진짜 맞는지 되읽어 확인 — 로컬 전용
 ```
+
+CI 는 typecheck·test·build 만 돈다. 프레임 검사는 ffmpeg 가 필요해서 **로컬에서 돌린다.**
+
+### 눈금은 게이트 두 개로 지킨다
 
 `pnpm ruler` 는 프레임마다 그 번호를 태운 영상을 만든다. **프레임 정확도 TC 5건이 이 영상 없이는
 못 돈다.** ffmpeg 의 `drawtext` 를 쓰지 않는다 — 이 맥의 ffmpeg 에는 그 필터가 없고(freetype
@@ -39,3 +44,20 @@ rawvideo 로 파이프하므로 어느 ffmpeg 빌드에서도 돈다.
 ## 외부 의존
 
 `ffprobe`(영상 규격 읽기)와 `ffmpeg`(눈금 영상 생성)가 시스템에 있어야 한다. npm 의존성은 0 이다.
+
+
+### 왜 게이트가 둘인가 (하나로는 못 지킨다)
+
+`verify:frames` 는 만든 영상을 되읽어 숫자를 확인한다. 그런데 **생성기와 검증기가
+`scripts/ruler-font.mjs` 를 공유해서, 글리프 자체가 틀리면 그리는 쪽과 읽는 쪽이 같이 틀려
+통과한다.** 실측(2026-08-19): 글리프 '7' 의 한 픽셀을 뒤집어도 10/10 통과했다.
+
+그래서 `test/ruler-font.test.ts` 가 **글리프 해시를 고정**한다. 둘이 서로 다른 것을 막는다.
+
+| 깨진 것 | 잡는 게이트 |
+| --- | --- |
+| 글리프 모양이 바뀜 | `pnpm test` — 고정 해시 불일치 |
+| 그리는 자리가 어긋남 | `pnpm verify:frames` — 되읽기 불일치 |
+
+글리프를 의도적으로 바꾸려면 **눈으로 다시 확인하고** 해시를 갱신한다. 해시만 갱신하면
+그 테스트는 아무것도 안 지킨다.
