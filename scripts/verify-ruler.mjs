@@ -23,7 +23,9 @@ function grabGray(file, n, width, height) {
     const ff = spawn("ffmpeg", [
       "-hide_banner", "-loglevel", "error",
       "-i", file,
-      "-vf", `select=eq(n\\,${n})`, "-vsync", "0", "-frames:v", "1",
+      // -vsync 는 최신 ffmpeg 에서 제거됐다. 로컬은 받아주는데 CI 의 정적 빌드(master)가
+      // "Unrecognized option 'vsync'" 로 거부했다(실측 2026-08-19). -fps_mode 가 5.1+ 대체다.
+      "-vf", `select=eq(n\\,${n})`, "-fps_mode", "passthrough", "-frames:v", "1",
       "-f", "rawvideo", "-pix_fmt", "gray", "-",
     ], { stdio: ["ignore", "pipe", "inherit"] });
 
