@@ -17,13 +17,20 @@ jobs:
       # **이미 있으면 설치하지 않는다.** 러너 이미지에 대체로 들어 있고, apt 는 종종 몇 분씩
       # 멈춘다(실측 2026-08-19: 두 실행이 이 한 줄에서 13분 넘게 걸렸다).
       - name: ffmpeg 준비
-        timeout-minutes: 5
+        timeout-minutes: 6
         run: |
+          # apt-get update 가 미러에서 몇 분씩 멈춘다(실측 2026-08-19: 두 실행이 13분 행,
+          # 한 실행이 5분 상한에 걸렸다). 러너 이미지에는 패키지 목록이 이미 있으므로
+          # **update 없이 설치를 먼저 시도**하고, 그게 안 될 때만 update 를 돈다.
           if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
             echo "이미 있습니다: $(ffmpeg -version | head -1)"
+          elif sudo apt-get install -y --no-install-recommends ffmpeg; then
+            echo "update 없이 설치했습니다."
           else
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
           fi
+          ffprobe -version | head -1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
