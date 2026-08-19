@@ -55,5 +55,13 @@
     "remotion",
     "agent",
     "feedback"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/woorichicken/framenote.git"
+  },
+  "homepage": "https://github.com/woorichicken/framenote#readme",
+  "bugs": {
+    "url": "https://github.com/woorichicken/framenote/issues"
+  }
 }
