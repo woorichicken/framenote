@@ -8,6 +8,11 @@ permissions:
   contents: read
   id-token: write # npm Trusted Publishing(OIDC). 빠지면 인증이 통째로 안 된다
 
+concurrency:
+  # 배포는 겹치면 안 된다. 앞 실행을 취소하지 않고 줄을 세운다.
+  group: release
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -35,6 +40,14 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
           cache: pnpm
+      # Trusted Publishing(OIDC) 은 **npm CLI 기능**이다. 러너 기본 npm 은 너무 낮아 OIDC 교환을
+      # 하지 않고, 그러면 인증 없이 publish 를 시도해 401 이 아니라 **404 "Not found"** 를 받는다
+      # — 이름이 틀린 것처럼 보이는 그 오류다(실측 2026-08-19: 0.1.1 이 이걸로 실패했다).
+      - name: npm 최신화 (OIDC 지원 버전)
+        run: |
+          npm install -g npm@latest
+          npm --version
+
       - run: pnpm install --frozen-lockfile
       # 배포 전에 CI 와 같은 게이트를 다시 본다. 여기서 막히면 npm 에 안 올라간다.
       - run: pnpm release:check
