@@ -71,11 +71,41 @@ test("네모 좌표는 창 크기와 무관한 비율로 기록된다", async ({
 });
 
 test("화면 위치가 없는 지적도 저장된다", async ({ page }) => {
+  // 앞선 이 테스트는 "작은 네모는 작성창을 안 연다"를 봤다 — TC 가 요구하는 것과 다른 것이라
+  // 스크러버만으로는 메모를 못 만든다는 사실을 놓쳤다(실사용 2026-08-20에 드러났다).
   await scrub(page, 0.3, 0.5);
-  // 네모를 그리지 않고 작성창을 여는 경로: 구간만 잡고 저장 API 가 아니라 UI 로 간다.
-  await dragOnVideo(page, [0.4, 0.4], [0.41, 0.41]);  // 임계값 미만 → 네모로 안 잡힌다
-  const opened = await page.locator("#composer.on").count();
-  expect(opened).toBe(0);                              // 너무 작은 네모는 작성창을 안 연다
+  await expect(page.locator("#noteHere")).toBeEnabled();
+  await expect(page.locator("#noteHere")).toHaveText("이 구간에 메모");
+
+  await page.locator("#noteHere").click();
+  await expect(page.locator("#composer")).toHaveClass(/on/);
+  await expect(page.locator("#coord")).toContainText("네모 없음");
+
+  await page.locator("#what").fill("이 구간이 너무 빠르다");
+  await page.locator("#save").click();
+  await expect(page.locator("#list .note")).toHaveCount(1);
+
+  const [note] = await notesOf(fx.server);
+  expect(note.rect).toBeNull();          // 네모 없이 저장됐다
+  expect(note.rectFrame).toBeNull();
+  expect(note.range[0]).toBeLessThan(note.range[1]);   // 구간은 살아 있다
+  expect(note.what).toBe("이 구간이 너무 빠르다");
+});
+
+test("스크러버를 클릭만 해도 그 프레임에 메모를 쓸 수 있다", async ({ page }) => {
+  await scrub(page, 0.25);
+  await expect(page.locator("#noteHere")).toHaveText("이 자리에 메모");
+  await page.locator("#noteHere").click();
+  await page.locator("#what").fill("이 프레임만");
+  await page.locator("#save").click();
+  await expect(page.locator("#list .note")).toHaveCount(1);
+  const [note] = await notesOf(fx.server);
+  expect(note.range[0]).toBe(note.range[1]);   // 점 제보
+  expect(note.rect).toBeNull();
+});
+
+test("고른 자리가 없으면 메모 버튼이 꺼져 있다", async ({ page }) => {
+  await expect(page.locator("#noteHere")).toBeDisabled();
 });
 
 test("무엇이 칸이 비면 저장을 거부하고 파일에 줄이 안 늘어난다", async ({ page }) => {

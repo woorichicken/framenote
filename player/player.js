@@ -289,6 +289,7 @@ window.addEventListener("mouseup", (e) => {
 function setSelection(range, byUser = true) {
   selection = range;
   selectionFromUser = byUser;
+  paintNoteHere();
   const total = INFO.info.totalFrames;
   const box = $("selbox");
   box.style.display = "block";
@@ -327,7 +328,26 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowRight") { v.pause(); void stepBy(e.shiftKey ? 30 : 1); e.preventDefault(); }
   if (e.key === "ArrowLeft") { v.pause(); void stepBy(e.shiftKey ? -30 : -1); e.preventDefault(); }
   if (e.key === " ") { $("play").click(); e.preventDefault(); }
+  if (e.key === "n" || e.key === "N") { $("noteHere").click(); e.preventDefault(); }
 });
+
+/**
+ * 스크러버로 고른 자리에서 바로 메모를 연다.
+ *
+ * 없으면 **네모를 그려야만** 작성창이 열려서, 문서가 허용하는 "화면 위치가 없는 지적"을
+ * 만들 길이 없다(실사용 2026-08-20에 드러났다 — 구간을 잡아 놓고 쓸 방법을 못 찾았다).
+ */
+function paintNoteHere() {
+  const b = $("noteHere");
+  b.disabled = INFO.locked || !selection;
+  b.textContent = selection && selection[0] !== selection[1] ? "이 구간에 메모" : "이 자리에 메모";
+}
+$("noteHere").onclick = () => {
+  if (INFO.locked || !selection) return;
+  v.pause();
+  pending = null; pendingFrame = null;   // 네모 없는 메모
+  openComposer();
+};
 
 // ── 네모 그리기 → 작성 ─────────────────────────────────────
 const draw = $("draw");
@@ -427,6 +447,7 @@ function closeComposer() {
     $("selbox").style.display = "none";
     $("selinfo").textContent = "";
   }
+  paintNoteHere();
   [...draw.querySelectorAll(".rect:not(.mark)")].forEach((e) => e.remove());
 }
 function msg(text, kind) {
@@ -547,6 +568,7 @@ async function loadInfo(keepFrame) {
   }
   if (INFO.problems?.length) console.warn("framenote:", INFO.problems.join(" / "));
   buildSegs();
+  paintNoteHere();
   // 같은 창에서 영상을 갈아 끼울 때 보던 프레임을 유지한다. 새 창을 띄우지 않는다.
   v.src = `/video?r=${INFO.info.render}`;
   await new Promise((r) => v.addEventListener("loadeddata", r, { once: true }));
