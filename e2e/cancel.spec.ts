@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { covers } from "../test/covers.js";
 import { bootFixture, dragOnVideo, notesOf, seek, waitReady, type Fixture } from "./helpers.js";
 import type { ServerHandle } from "../src/server.js";
 
@@ -59,6 +60,9 @@ test("작업중 메모를 고치면 경고 후 초안으로 되돌린다", async
 });
 
 test("작업중 메모를 고치면 에이전트가 실제로 중단 신호를 받는다", async ({ page }) => {
+  covers(
+    "작업중 메모를 고치면 에이전트가 실제로 중단한다",
+  );
   const agent = attach(fx.server.url);
   await agent.ready;
 

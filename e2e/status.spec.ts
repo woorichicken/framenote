@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { covers } from "../test/covers.js";
 import { expect, test, type Page } from "@playwright/test";
 import {
   bootFixture, currentFrame, dragOnVideo, makeRuler, notesOf, seek, waitReady, type Fixture,
@@ -37,6 +38,9 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async () => { await fx?.cleanup(); });
 
 test("에이전트가 바꾼 상태가 화면에 즉시 나타난다", async ({ page }) => {
+  covers(
+    "보내기 직후 상단과 메모 카드에 동시에 작업중이 표시된다",
+  );
   await makeNote(page, 40, "상태 반영 확인");
   const { batch } = await send();
   expect(batch).toBeTruthy();
@@ -80,6 +84,11 @@ test("실패 메모 다시 보내기가 대기 중인 초안을 끌고 나가지
 });
 
 test("새 렌더본이 오면 미완 메모가 낡음이 되고 반영됨은 넘어가지 않는다", async ({ page }) => {
+  covers(
+    "새 렌더본이 오면 이전 렌더본의 미완 메모가 낡음이 된다",
+    "반영됨 메모는 낡음으로 넘어가지 않는다",
+    "재렌더 결과가 같은 창에서 교체되고 새 창이 뜨지 않는다",
+  );
   await makeNote(page, 30, "고쳐질 것");
   await makeNote(page, 60, "안 고쳐질 것");
   await send();
@@ -98,6 +107,10 @@ test("새 렌더본이 오면 미완 메모가 낡음이 되고 반영됨은 넘
 });
 
 test("반영됨 메모를 고르면 그 구간으로 이동하고 해결됨으로 닫을 수 있다", async ({ page }) => {
+  covers(
+    "반영됨 메모를 고르면 그 구간으로 이동하고 닫을 수 있다",
+    "영상이 교체돼도 보던 프레임 위치를 유지한다",
+  );
   await makeNote(page, 123, "확인할 것");
   await send();
   const [n] = await notesOf(fx.server);
@@ -141,6 +154,9 @@ test("고쳐지지 않은 메모를 다시 열면 새 렌더본 기준으로 되
 });
 
 test("낡은 메모를 다시 찍으면 글과 이미지는 남고 좌표만 갱신된다", async ({ page }) => {
+  covers(
+    "낡은 메모를 다시 찍으면 구간·좌표·렌더본이 갱신되고 글과 이미지는 남는다",
+  );
   await makeNote(page, 40, "낡을 것");
   await send();
   const [first] = await notesOf(fx.server);
@@ -164,6 +180,9 @@ test("낡은 메모를 다시 찍으면 글과 이미지는 남고 좌표만 갱
 });
 
 test("보내기 전 메모는 글과 구간을 고칠 수 있다", async ({ page }) => {
+  covers(
+    "보내기 전 메모는 글·구간·이미지를 모두 고칠 수 있다",
+  );
   await makeNote(page, 30, "고치기 전");
   await act(page, "수정").click();
   await expect(page.locator("#what")).toHaveValue("고치기 전");

@@ -37,6 +37,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm release:check
+      # 요구사항과 테스트의 짝이 끊기면 여기서 막는다. 이게 없어서 세 건이 헛것을 검사했다.
+      - run: pnpm tc:check
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build

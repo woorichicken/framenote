@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { covers } from "./covers.js";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -62,6 +63,10 @@ describe("왕복", () => {
   let batchId = "";
 
   it("영상 규격을 파일에서 읽는다 — 브라우저가 아니라", async () => {
+  covers(
+    "mp4를 열면 창 하나에 규격과 렌더본이 표시된다",
+    "Remotion이 아닌 영상도 열리고 프레임만 표시된다",
+  );
     const { body } = await api("/api/info");
     expect(body.info.fps).toBe(30);
     expect(body.info.totalFrames).toBe(60);
@@ -71,6 +76,10 @@ describe("왕복", () => {
   });
 
   it("메모를 남기면 프레임·좌표·렌더본이 자동으로 붙는다", async () => {
+  covers(
+    "열기에서 계산한 렌더본이 이후 모든 메모에 실제로 붙는다",
+    "메모 한 건이 규정된 항목을 모두 담아 한 줄로 저장된다",
+  );
     const { status, body } = await api("/api/notes", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -91,6 +100,9 @@ describe("왕복", () => {
   });
 
   it("무엇이 칸이 비면 거부하고 파일에 줄이 안 늘어난다", async () => {
+  covers(
+    "무엇이 칸이 비면 저장을 거부한다",
+  );
     const before = (await api("/api/notes")).body.length;
     const { status } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -101,6 +113,9 @@ describe("왕복", () => {
   });
 
   it("어떻게를 비워도 저장된다 — 그냥 이상하다도 정당한 지적이다", async () => {
+  covers(
+    "어떻게를 비워도 저장되고 이미지·구간을 유도한다",
+  );
     const { status, body } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: [50, 50], what: "여기가 어색하다" }),
@@ -110,6 +125,11 @@ describe("왕복", () => {
   });
 
   it("보내기를 누르면 감시 중인 에이전트가 실제로 신호를 받는다", async () => {
+  covers(
+    "여러 건을 쌓아 한 번에 보내면 신호가 한 번만 간다",
+    "신호에는 묶음 식별자와 건수만 담긴다",
+    "보내기를 누르면 감시 중인 에이전트가 실제로 받아 집는다",
+  );
     const ws = new WebSocket(`${server.url.replace("http", "ws")}/feed`);
     const signal = new Promise<any>((res, rej) => {
       const timer = setTimeout(() => rej(new Error("신호가 안 왔다")), 5000);
@@ -139,6 +159,10 @@ describe("왕복", () => {
   });
 
   it("서버 없이 파일만으로도 같은 값을 읽을 수 있다", async () => {
+  covers(
+    "파일로 읽은 것과 서버로 읽은 것이 같은 값을 준다",
+    "화면에서 만든 메모가 파일에 손실 없이 기록된다",
+  );
     // git 저장소가 아니면 영상이 있는 디렉터리가 최상단이다.
     const file = join(dir, "out", ".framenote", "final.mp4", "notes.jsonl");
     expect(existsSync(file)).toBe(true);
@@ -157,6 +181,9 @@ describe("왕복", () => {
   });
 
   it("한 요청에 반영됨과 실패를 섞어 보낼 수 있다", async () => {
+  covers(
+    "실패 메모도 재렌더 후 낡음으로 넘어간다",
+  );
     const sent: Note[] = (await api(`/api/notes?batch=${batchId}`)).body;
     const [a, b] = sent;
     const { status, body } = await api("/api/status", {
@@ -186,6 +213,9 @@ describe("왕복", () => {
   });
 
   it("영상이 새 렌더본으로 갈아 끼워진다", async () => {
+  covers(
+    "렌더 출력 경로가 달라도 영상이 교체된다",
+  );
     const { body } = await api("/api/info");
     expect(body.video).toBe(video2);
     expect(body.info.totalFrames).toBe(90); // 새 렌더본의 규격을 다시 읽는다
@@ -193,6 +223,9 @@ describe("왕복", () => {
   });
 
   it("메모를 지우면 붙은 이미지 파일도 사라진다", async () => {
+  covers(
+    "이미지는 별도 파일로 저장되고 메모에는 경로만 들어간다",
+  );
     const { body: created } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: [3, 3], what: "이미지 붙은 메모" }),
@@ -217,6 +250,9 @@ describe("왕복", () => {
   });
 
   it("알아볼 수 없는 이미지는 사유를 알린다 — 조용히 버리지 않는다", async () => {
+  covers(
+    "받을 수 없는 이미지는 사유를 표시한다",
+  );
     const { body: created } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: [4, 4], what: "형식 시험" }),

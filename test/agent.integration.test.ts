@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { covers } from "./covers.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -49,6 +50,9 @@ afterEach(async () => {
 
 describe("에이전트 접점", () => {
   it("서버 목록 파일로 자기 영상의 주소를 찾는다", async () => {
+  covers(
+    "에이전트가 서버 목록 파일로 자기 영상의 주소를 찾는다",
+  );
     execFileSync("git", ["init", "-q"], { cwd: dir });
     const a = join(dir, "a", "out", "final.mp4");
     const b = join(dir, "b", "out", "final.mp4");
@@ -105,6 +109,7 @@ describe("에이전트 접점", () => {
   });
 
   it("통로가 끊겨도 메모는 남고 재연결 후 이어받는다", async () => {
+    covers("에이전트가 없어도 메모가 남고 나중에 이어받는다");
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -125,6 +130,26 @@ describe("에이전트 접점", () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]!.status).toBe("sent");
     again.close();
+  });
+
+  it("메모를 저장하는 것만으로는 에이전트를 부르지 않는다", async () => {
+    // 쓰는 대로 계속 부르면 에이전트가 덜 쓴 메모에 반응하고, 알림이 잦으면 감시가 끊긴다.
+    const v = join(dir, "out", "final.mp4");
+    makeRuler(v, 30);
+    const s = await startServer({ videoPath: v, playerDir: PLAYER });
+    servers.push(s);
+    const ws = attach(s.url);
+    await ws.ready;
+
+    for (let i = 1; i <= 5; i++) await post(s, { range: [i, i], what: `메모 ${i}` });
+    await settle(600);
+    expect(readNotes(findStoreRoot(v), v)).toHaveLength(5);   // 파일에는 다 있다
+    expect(ws.got).toHaveLength(0);                            // 신호는 한 번도 안 갔다
+
+    await fetch(`${s.url}/api/send`, { method: "POST" });
+    await settle(400);
+    expect(ws.got).toHaveLength(1);                            // 보내기를 눌러야 간다
+    ws.close();
   });
 
   it("서버 없이 파일만으로 에이전트가 일할 수 있다", async () => {
@@ -150,6 +175,9 @@ describe("에이전트 접점", () => {
   });
 
   it("서버가 꺼져 상태를 못 남기면 조용히 끝나지 않는다", async () => {
+  covers(
+    "서버가 꺼져 상태를 못 남기면 조용히 끝내지 않는다",
+  );
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -191,6 +219,9 @@ describe("에이전트 접점", () => {
   });
 
   it("렌더 명령이 없으면 에이전트가 그 사실을 알 수 있다", async () => {
+  covers(
+    "렌더 명령이 없으면 재렌더하지 않고 사유를 남긴다",
+  );
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 20);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });

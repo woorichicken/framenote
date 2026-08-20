@@ -33,12 +33,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ruler": "node scripts/make-ruler-video.mjs",
-    "all": "pnpm release:check && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e",
+    "all": "pnpm release:check && pnpm tc:check && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e",
     "verify:frames": "node scripts/verify-frames.mjs",
     "verify:ruler": "node scripts/verify-ruler.mjs",
     "release:check": "node scripts/check-release-contract.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "tc:check": "node scripts/check-tc-coverage.mjs",
+    "tc:sync": "node scripts/sync-testcases.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

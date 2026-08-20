@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { covers } from "./covers.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -57,6 +58,9 @@ describe("진입", () => {
   });
 
   it("열 영상이 없으면 찾은 범위와 확장자를 알리고 끝낸다", async () => {
+  covers(
+    "열 영상이 없으면 찾은 범위를 알리고 끝낸다",
+  );
     mkdirSync(join(dir, "empty"), { recursive: true });
     process.chdir(join(dir, "empty"));
     const cap = capture();
@@ -106,6 +110,9 @@ describe("진입", () => {
   });
 
   it("규격을 못 읽는 파일은 창을 열되 메모 작성을 잠근다", async () => {
+  covers(
+    "프레임 레이트를 못 읽으면 메모 작성을 막고 사유를 표시한다",
+  );
     // 확장자만 영상인 쓰레기 파일 — ffprobe 가 스트림을 못 찾는다.
     const broken = join(dir, "out", "broken.mp4");
     mkdirSync(dirname(broken), { recursive: true });
@@ -125,6 +132,9 @@ describe("진입", () => {
   });
 
   it("확정 전에는 파일이 아예 생기지 않는다", async () => {
+  covers(
+    "확정 전 내용은 파일에 쓰이지 않는다",
+  );
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 20);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
