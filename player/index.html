@@ -106,6 +106,8 @@
         <label for="want">어떻게 <span style="text-transform:none;letter-spacing:0">— 비워도 됩니다</span></label>
         <input type="text" id="want" placeholder="하단 100px 안으로">
         <div class="hint" id="pastehint">Cmd/Ctrl+V 로 이미지를 붙일 수 있습니다</div>
+        <div style="margin:-4px 0 8px"><button id="pickFile" style="font-size:11px;padding:3px 8px">파일 고르기</button>
+        <input type="file" id="fileInput" accept="image/*" multiple hidden></div>
         <div style="display:flex;gap:6px">
           <button class="primary" id="save" style="flex:1">저장</button>
           <button id="cancel">취소</button>

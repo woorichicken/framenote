@@ -459,14 +459,37 @@ $("cancel").onclick = closeComposer;
 // 이미지 붙여넣기 — 커서가 입력칸 밖이어도 받는다. 캡처하러 나갔다 오면 커서가 어디에도 없다.
 document.addEventListener("paste", (e) => {
   if (!$("composer").classList.contains("on")) return;
-  const files = [...(e.clipboardData?.files ?? [])];
-  const items = [...(e.clipboardData?.items ?? [])]
+  const cd = e.clipboardData;
+  const files = [...(cd?.files ?? [])];
+  const items = [...(cd?.items ?? [])]
     .filter((i) => i.kind === "file").map((i) => i.getAsFile()).filter(Boolean);
-  const picked = files.length ? files : items;
-  if (!picked.length) return;   // 이미지가 아니면 그대로 통과시켜 글상자로 간다
-  e.preventDefault();
-  for (const f of picked) addImage(f);
+  const found = files.length ? files : items;
+  if (found.length) {
+    e.preventDefault();
+    for (const f of found) addImage(f);
+    return;
+  }
+
+  // 이미지가 없으면 **왜 없었는지 말한다.** 조용히 넘기면 사용자는 붙인 줄 알고 넘어간다
+  // (실사용 2026-08-20: "붙여넣기가 안 된다"의 원인을 화면만 보고는 알 수 없었다).
+  const types = [...(cd?.types ?? [])];
+  const text = cd?.getData("text/plain") ?? "";
+  if (types.length === 0) {
+    msg("클립보드가 비어 있습니다. 화면을 캡처했다면 클립보드로 복사(⌃⌘⇧4)했는지 확인하거나, 아래 파일 고르기를 쓰세요.", "err");
+  } else if (text.trim() !== "") {
+    // 글은 그대로 입력칸으로 흘려보낸다 — 가로채지 않는다.
+    return;
+  } else {
+    msg(`클립보드에 이미지가 없습니다 (${types.join(", ")}). 파일 고르기를 쓰세요.`, "err");
+  }
 });
+
+// 파일 고르기 — 문서가 약속한 세 번째 경로다. 캡처가 파일로 저장된 경우 이게 유일한 길이다.
+$("pickFile").onclick = () => $("fileInput").click();
+$("fileInput").onchange = (e) => {
+  for (const f of e.target.files) addImage(f);
+  e.target.value = "";   // 같은 파일을 다시 고를 수 있게 비운다
+};
 draw.addEventListener("dragover", (e) => e.preventDefault());
 draw.addEventListener("drop", (e) => {
   if (!$("composer").classList.contains("on")) return;
@@ -477,6 +500,7 @@ function addImage(file) {
   if (pendingImages.length >= 10) { msg("이미지는 메모당 10장까지입니다.", "err"); return; }
   if (file.size > 20 * 1024 * 1024) { msg(`${file.name || "이미지"} 가 20MB를 넘습니다.`, "err"); return; }
   pendingImages.push(file);
+  msg("", "");
   updateWantNudge();
 }
 

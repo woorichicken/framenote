@@ -57,20 +57,64 @@ test("커서가 입력칸 밖이어도 이미지 붙여넣기가 된다", async 
   expect(JSON.stringify(n)).not.toContain("iVBORw0");
 });
 
-test("여러 장 붙일 수 있고 형식 정보가 없어도 확장자로 알아본다", async ({ page }) => {
+test("세 가지 경로로 이미지를 여러 장 붙일 수 있다", async ({ page }) => {
+  // 앞선 이 테스트는 붙여넣기만 두 번 하고 "세 경로"라고 했다 — 파일 고르기가 아예 구현돼
+  // 있지 않은 것을 놓쳤다(실사용 2026-08-20에 드러났다). 이제 셋을 각각 쓴다.
   fx = await bootFixture({ frames: 120 });
   await page.goto(fx.server.url);
   await waitReady(page);
   await seek(page, 30);
   await dragOnVideo(page, [0.2, 0.2], [0.5, 0.5]);
+
+  // 1) 붙여넣기
   await pasteImage(page, "a.png");
-  await pasteImage(page, "b.png", "");           // 클립보드가 형식을 안 알려주는 경우
+  await expect(page.locator("#pastehint")).toContainText("1장");
+
+  // 2) 끌어다 놓기
+  await page.evaluate(() => {
+    const png = Uint8Array.from(atob(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    ), (c) => c.charCodeAt(0));
+    const dt = new DataTransfer();
+    dt.items.add(new File([png], "b.png", { type: "image/png" }));
+    document.getElementById("draw")!.dispatchEvent(
+      new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }),
+    );
+  });
   await expect(page.locator("#pastehint")).toContainText("2장");
-  await page.locator("#what").fill("여러 장");
+
+  // 3) 파일 고르기 — 캡처가 파일로 저장된 경우 이게 유일한 길이다.
+  await page.setInputFiles("#fileInput", {
+    name: "c.png", mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"),
+  });
+  await expect(page.locator("#pastehint")).toContainText("3장");
+
+  await page.locator("#what").fill("세 경로");
   await page.locator("#save").click();
   await expect(page.locator("#list .note")).toHaveCount(1);
   const [n] = await notesOf(fx.server);
-  expect(n.images).toHaveLength(2);              // 나중 것이 앞엣것을 대체하지 않는다
+  expect(n.images).toHaveLength(3);          // 셋 다 붙었고 서로 대체하지 않았다
+});
+
+test("이미지 없는 붙여넣기는 왜 안 붙었는지 말한다", async ({ page }) => {
+  // 조용히 넘기면 사용자는 붙인 줄 알고 넘어간다 — 실제로 그 일이 있었다.
+  fx = await bootFixture({ frames: 120 });
+  await page.goto(fx.server.url);
+  await waitReady(page);
+  await seek(page, 30);
+  await dragOnVideo(page, [0.2, 0.2], [0.5, 0.5]);
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new ClipboardEvent("paste", {
+      clipboardData: new DataTransfer(), bubbles: true,
+    }));
+  });
+  await expect(page.locator("#cmsg")).toBeVisible();
+  await expect(page.locator("#cmsg")).toContainText("클립보드가 비어 있습니다");
+  await expect(page.locator("#cmsg")).toContainText("파일 고르기");   // 대안을 알려준다
 });
 
 test("이미지가 아닌 붙여넣기는 글로 들어간다", async ({ page }) => {
