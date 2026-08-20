@@ -16,6 +16,7 @@ let pending = null;        // 작성 중인 네모
 let pendingFrame = null;
 let current = null;        // 목록에서 고른 메모 id
 let pendingImages = [];    // 저장 전에 붙인 이미지
+const picked = new Set();  // 복사하려고 고른 메모
 
 const FRAME_OK = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
 
@@ -174,6 +175,13 @@ async function startEdit(n) {
       "에이전트가 이 메모로 작업 중입니다. 지금 고치면 그 작업이 취소되고 초안으로 돌아갑니다. 계속할까요?",
     );
     if (!go) return;
+    // **여기서 바로 되돌린다.** 저장할 때까지 미루면 사람이 글을 쓰는 동안 에이전트가 계속
+    // 그 메모로 일한다(실측 2026-08-20). 취소 신호도 이때 나가야 의미가 있다.
+    await api(`/api/notes/${n.id}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: "{}",
+    });
+    await refresh();
+    n = notes.find((x) => x.id === n.id) ?? n;
   }
   editing = n;
   await selectNote(n.id);
@@ -209,7 +217,9 @@ function paintNotes() {
     el.className = "note" + (n.id === current ? " cur" : "");
     const span = n.range[0] === n.range[1] ? `f${n.range[0]}` : `f${n.range[0]}–${n.range[1]}`;
     el.innerHTML =
-      `<div class="nr"><span class="dot ${n.status}"></span>${n.id.slice(0, 4)} · ${span} · ${KO[n.status]}` +
+      `<div class="nr"><input type="checkbox" class="pick" data-id="${n.id}"` +
+      `${picked.has(n.id) ? " checked" : ""} title="복사할 메모 고르기">` +
+      `<span class="dot ${n.status}"></span>${n.id.slice(0, 4)} · ${span} · ${KO[n.status]}` +
       `${n.scene ? " · " + n.scene : ""}</div><div class="nw"></div>` +
       (n.want ? `<div class="nt"></div>` : "") +
       (n.failureReason ? `<div class="nf"></div>` : "") +
@@ -217,7 +227,12 @@ function paintNotes() {
     el.querySelector(".nw").textContent = n.what;
     if (n.want) el.querySelector(".nt").textContent = n.want;
     if (n.failureReason) el.querySelector(".nf").textContent = n.failureReason;
-    el.onclick = () => selectNote(n.id);
+    el.onclick = (e) => { if (!e.target.closest(".pick")) void selectNote(n.id); };
+    el.querySelector(".pick").onchange = (e) => {
+      e.stopPropagation();
+      if (e.target.checked) picked.add(n.id); else picked.delete(n.id);
+      paintCopyLabel();
+    };
 
     const acts = document.createElement("div");
     acts.className = "acts";
@@ -236,6 +251,9 @@ function paintNotes() {
   $("work").textContent = working.length
     ? `⚬ ${working.map((n) => n.id.slice(0, 4)).join(", ")} 작업 중…` : "";
   $("counts").textContent = `${open.length}건`;
+  // 목록에서 사라진 메모는 선택도 풀어준다.
+  for (const id of [...picked]) if (!open.some((n) => n.id === id)) picked.delete(id);
+  paintCopyLabel();
   const sendable = notes.filter((n) => n.status === "draft" || n.status === "failed").length;
   $("send").disabled = sendable === 0;
   $("send").textContent = sendable ? `에이전트에게 보내기 (${sendable})` : "보낼 메모 없음";
@@ -480,9 +498,15 @@ $("send").onclick = async () => {
   } catch (e) { alert(e.message); }
 };
 
+function paintCopyLabel() {
+  $("copy").textContent = picked.size ? `복사 (${picked.size})` : "복사";
+}
+
 $("copy").onclick = async () => {
   // 글은 서버에서 받는다. 여기서 조립하면 에이전트가 받는 것과 갈라진다.
-  const text = await (await fetch("/api/format")).text();
+  // 고른 게 있으면 그것만, 없으면 열린 것 전부.
+  const q = picked.size ? `?ids=${[...picked].join(",")}` : "";
+  const text = await (await fetch(`/api/format${q}`)).text();
   try {
     await navigator.clipboard.writeText(text);
     $("copy").textContent = "복사됨";
