@@ -1,3 +1,4 @@
+export { formatNotes, noteFields } from "./format.js";
 export type {
   FrameRange,
   Note,

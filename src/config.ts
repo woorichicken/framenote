@@ -87,13 +87,15 @@ export function listServers(storeRoot: string): ServerEntry[] {
 export function registerServer(storeRoot: string, entry: ServerEntry): void {
   const file = serverFileFor(storeRoot);
   mkdirSync(dirname(file), { recursive: true });
-  const kept = readServerEntries(storeRoot).filter((e) => alive(e) && e.pid !== entry.pid);
+  // **포트로 구분한다.** pid 로 하면 한 프로세스가 두 영상을 열었을 때 뒤엣것이 앞엣것을
+  // 지운다 — 서버의 정체는 프로세스가 아니라 포트다(실측 2026-08-20).
+  const kept = readServerEntries(storeRoot).filter((e) => alive(e) && e.port !== entry.port);
   writeFileSync(file, JSON.stringify([...kept, entry], null, 2) + "\n", "utf8");
 }
 
-export function unregisterServer(storeRoot: string, pid: number): void {
+export function unregisterServer(storeRoot: string, port: number): void {
   const file = serverFileFor(storeRoot);
-  const kept = readServerEntries(storeRoot).filter((e) => e.pid !== pid && alive(e));
+  const kept = readServerEntries(storeRoot).filter((e) => e.port !== port && alive(e));
   try {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(kept, null, 2) + "\n", "utf8");

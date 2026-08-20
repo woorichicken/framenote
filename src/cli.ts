@@ -44,30 +44,46 @@ function openBrowser(url: string): void {
   }
 }
 
+/**
+ * 어떤 영상을 열지 정하고, 사람에게 뭐라고 알릴지까지 함께 돌려준다.
+ *
+ * `run` 에서 떼어낸 이유: `run` 은 종료 신호까지 살아 있어 테스트에서 부를 수 없다.
+ * 고르는 규칙과 알리는 문구는 계약이라 따로 검사할 수 있어야 한다.
+ */
+export function resolveVideo(
+  opt: CliOptions,
+  cwd: string,
+): { video: string; notice?: string } | { error: string } {
+  if (opt.video) {
+    const abs = resolve(cwd, opt.video);
+    if (!existsSync(abs) || !statSync(abs).isFile()) {
+      return { error: `영상을 열 수 없습니다: ${abs}\n` };
+    }
+    return { video: abs };
+  }
+  const picked = pickLatestVideo(cwd);
+  if (!picked) {
+    return {
+      error:
+        `열 영상을 찾지 못했습니다.\n  찾은 곳: ${cwd} 와 그 하위\n` +
+        `  찾은 확장자: ${VIDEO_EXTS.join(" · ")}\n` +
+        `  (node_modules · .git · 점으로 시작하는 폴더는 건너뜁니다)\n`,
+    };
+  }
+  return { video: picked, notice: `영상을 골랐습니다: ${picked}\n` };
+}
+
 export async function run(argv: readonly string[]): Promise<number> {
   const opt = parseCliArgs(argv);
 
   // 창을 아예 안 띄우는 경우는 셋뿐이다. 셋 다 터미널에 사유를 출력하고 끝낸다.
-  let video: string;
-  if (opt.video) {
-    const abs = resolve(opt.video);
-    if (!existsSync(abs) || !statSync(abs).isFile()) {
-      process.stderr.write(`영상을 열 수 없습니다: ${abs}\n`);
-      return 1;
-    }
-    video = abs;
-  } else {
-    const picked = pickLatestVideo(process.cwd());
-    if (!picked) {
-      process.stderr.write(
-        `열 영상을 찾지 못했습니다.\n  찾은 곳: ${process.cwd()} 와 그 하위\n` +
-          `  찾은 확장자: ${VIDEO_EXTS.join(" · ")}\n  (node_modules · .git · 점으로 시작하는 폴더는 건너뜁니다)\n`,
-      );
-      return 1;
-    }
-    video = picked;
-    process.stdout.write(`영상을 골랐습니다: ${video}\n`);
+  const resolved = resolveVideo(opt, process.cwd());
+  if ("error" in resolved) {
+    process.stderr.write(resolved.error);
+    return 1;
   }
+  const video = resolved.video;
+  if (resolved.notice) process.stdout.write(resolved.notice);
 
   const handle = await startServer({
     videoPath: video,

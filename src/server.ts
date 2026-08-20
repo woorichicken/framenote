@@ -8,6 +8,7 @@ import {
   MAX_IMAGES_PER_NOTE, MAX_IMAGE_BYTES, appendNote, extensionFor,
   readNotes, removeImages, saveImage, writeNotes,
 } from "./notes.js";
+import { formatNotes } from "./format.js";
 import { findStoreRoot, storeDirFor } from "./paths.js";
 import { sceneAt } from "./scenes.js";
 import { frameToTimecode } from "./timecode.js";
@@ -152,6 +153,18 @@ export async function startServer(opts: {
       const batch = url.searchParams.get("batch");
       const all = notes();
       return json(res, 200, batch ? all.filter((n) => n.batch === batch) : all);
+    }
+
+    // 복사본과 에이전트 전달본이 **같은 한 곳**에서 나오게 한다. 브라우저가 따로 조립하면
+    // 한쪽만 고쳐져 갈라진다.
+    if (path === "/api/format" && req.method === "GET") {
+      const want = url.searchParams.get("ids");
+      const ids = want ? new Set(want.split(",")) : null;
+      const picked = notes().filter((n) => (ids ? ids.has(n.id) : n.status !== "closed"));
+      const text = formatNotes(picked, state.videoPath, state.info);
+      res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+      res.end(text);
+      return;
     }
 
     if (path === "/api/notes" && req.method === "POST") {
@@ -387,7 +400,7 @@ export async function startServer(opts: {
       hub.closeAll();
       for (const res of sse) { try { res.end(); } catch { /* 이미 닫힘 */ } }
       sse.clear();
-      unregisterServer(storeRoot, process.pid);
+      unregisterServer(storeRoot, port);
       // 살아 있는 연결을 끊지 않으면 close 가 끝나지 않는다. 브라우저의 EventSource 는
       // 끊기면 2초 뒤 다시 붙어서, 닫는 동안 새 연결이 계속 생긴다(실측 2026-08-19:
       // 테스트 정리가 60초 타임아웃까지 매달렸다). Ctrl-C 도 같은 이유로 안 끝난다.

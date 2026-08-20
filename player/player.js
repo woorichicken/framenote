@@ -481,8 +481,8 @@ $("send").onclick = async () => {
 };
 
 $("copy").onclick = async () => {
-  const open = notes.filter((n) => n.status !== "closed");
-  const text = renderForAgent(open);
+  // 글은 서버에서 받는다. 여기서 조립하면 에이전트가 받는 것과 갈라진다.
+  const text = await (await fetch("/api/format")).text();
   try {
     await navigator.clipboard.writeText(text);
     $("copy").textContent = "복사됨";
@@ -497,19 +497,6 @@ $("copy").onclick = async () => {
     ta.onblur = () => ta.remove();
   }
 };
-
-// 복사본과 에이전트 전달본은 이 한 곳에서 나온다. 두 벌이면 한쪽만 고쳐져 갈라진다.
-function renderForAgent(list) {
-  const head = `# framenote — ${INFO.video}\n렌더본 ${INFO.info.render} · ${INFO.info.width}x${INFO.info.height} ${INFO.info.fps}fps\n`;
-  return head + list.map((n) => {
-    const span = n.range[0] === n.range[1] ? `f${n.range[0]}` : `f${n.range[0]}–${n.range[1]}`;
-    const rect = n.rect ? ` · 네모 [${[n.rect.x0, n.rect.y0, n.rect.x1, n.rect.y1].map((x) => x.toFixed(2)).join(", ")}] @f${n.rectFrame}` : "";
-    return `\n## ${n.id} · ${span} (${n.tc})${n.scene ? " · " + n.scene : ""}${rect}\n` +
-      `무엇이: ${n.what}\n어떻게: ${n.want ?? "(비어 있음 — 판단 필요)"}\n` +
-      (n.images.length ? `이미지: ${n.images.join(", ")}\n` : "") +
-      `상태: ${KO[n.status]} · 렌더본 ${n.render}\n`;
-  }).join("");
-}
 
 // ── 갱신 ──────────────────────────────────────────────────
 async function refresh() {
