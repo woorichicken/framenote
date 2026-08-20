@@ -15,18 +15,24 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async () => { await fx?.cleanup(); });
 
 test("스크러버 클릭은 한 프레임짜리 구간을 만든다", async ({ page }) => {
+  // 실행: 스크러버의 632프레임 지점을 한 번 클릭하고 메모를 저장한다.
+  // 기대: 저장된 메모의 구간이 시작 632, 끝 632로 기록된다.
   await scrub(page, 0.25);
   const info = await page.locator("#selinfo").textContent();
   expect(info).toMatch(/^점 f\d+$/);
 });
 
 test("스크러버 드래그는 구간을 만든다", async ({ page }) => {
+  // 실행: 스크러버에서 480프레임부터 810프레임까지 드래그하고 메모를 저장한다.
+  // 기대: 저장된 메모의 구간이 시작 480, 끝 810으로 기록된다.
   await scrub(page, 0.2, 0.5);
   const info = await page.locator("#selinfo").textContent();
   expect(info).toMatch(/^구간 f\d+–\d+ \(반복 재생\)$/);
 });
 
 test("구간이 잡히면 그 구간만 반복 재생된다", async ({ page }) => {
+  // 실행: 재생을 누르고 20초 이상 둔다.
+  // 기대: 재생이 810프레임에 닿으면 480프레임으로 돌아가 반복되고, 810을 넘어 진행하지 않는다.
   await scrub(page, 0.1, 0.2);          // 약 f20–f40
   const [from, to] = (await page.locator("#selinfo").textContent())!
     .match(/f(\d+)–(\d+)/)!.slice(1).map(Number) as [number, number];
@@ -40,6 +46,8 @@ test("구간이 잡히면 그 구간만 반복 재생된다", async ({ page }) =
 });
 
 test("네모 좌표는 창 크기와 무관한 비율로 기록된다", async ({ page, viewport }) => {
+  // 실행: 영상의 특정 지점에 네모를 그려 저장한 뒤, 창 너비를 절반으로 줄이고 같은 메모를 다시 표시한다.
+  // 기대: 저장된 좌표 값이 0~1 사이 비율로 기록되어 있고, 창 크기가 달라져도 네모가 영상의 같은 자리에 그려진다.
   await seek(page, 50);
   await dragOnVideo(page, [0.2, 0.3], [0.6, 0.7]);
   await page.locator("#what").fill("비율 기록 확인");
@@ -71,6 +79,8 @@ test("네모 좌표는 창 크기와 무관한 비율로 기록된다", async ({
 });
 
 test("화면 위치가 없는 지적도 저장된다", async ({ page }) => {
+  // 실행: 무엇이 칸만 채우고 저장한다.
+  // 기대: 메모가 저장되고 좌표 값이 비어 있다.
   // 앞선 이 테스트는 "작은 네모는 작성창을 안 연다"를 봤다 — TC 가 요구하는 것과 다른 것이라
   // 스크러버만으로는 메모를 못 만든다는 사실을 놓쳤다(실사용 2026-08-20에 드러났다).
   await scrub(page, 0.3, 0.5);
@@ -125,6 +135,8 @@ test("어떻게가 비면 구간과 이미지를 붙이도록 유도한다", asy
 });
 
 test("네모만 그려 시작한 메모의 구간이 현재 프레임으로 채워진다", async ({ page }) => {
+  // 실행: 구간을 잡지 않고 영상 위에 네모만 그린다.
+  // 기대: 새 메모가 시작되고 그 구간이 시작 917, 끝 917로 채워진다.
   await seek(page, 117);
   await dragOnVideo(page, [0.3, 0.3], [0.6, 0.6]);
   await expect(page.locator("#coord")).toContainText("f117");
@@ -136,6 +148,8 @@ test("네모만 그려 시작한 메모의 구간이 현재 프레임으로 채�
 });
 
 test("포커스가 빠지는 것으로 저장이 확정되지 않는다", async ({ page }) => {
+  // 실행: 글 입력칸 밖을 클릭해 포커스를 뺀다.
+  // 기대: 저장 파일에 줄이 추가되지 않는다.
   await seek(page, 40);
   await dragOnVideo(page, [0.2, 0.2], [0.5, 0.5]);
   await page.locator("#what").fill("확정 안 함");
@@ -146,6 +160,8 @@ test("포커스가 빠지는 것으로 저장이 확정되지 않는다", async 
 });
 
 test("조작 결과가 편집 중인 메모 하나에만 붙는다", async ({ page }) => {
+  // 실행: 스크러버로 구간을 다시 잡고 영상 위에 네모를 그리고 이미지를 붙인다.
+  // 기대: 세 값이 모두 편집 중인 그 메모에만 반영되고 다른 메모는 그대로다.
   await seek(page, 20);
   await dragOnVideo(page, [0.1, 0.1], [0.4, 0.4]);
   await page.locator("#what").fill("첫 번째");

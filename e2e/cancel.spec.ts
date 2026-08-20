@@ -36,6 +36,8 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async () => { await fx?.cleanup(); });
 
 test("작업중 메모를 고치면 경고 후 초안으로 되돌린다", async ({ page }) => {
+  // 실행: 그 메모의 글을 고치려 한다.
+  // 기대: 에이전트가 그 내용으로 작업 중이라는 경고가 먼저 표시된다.
   await makeNote(page, 40, "고칠 것");
   await send(fx.server);
   const [n] = await notesOf(fx.server);
@@ -63,6 +65,8 @@ test("작업중 메모를 고치면 에이전트가 실제로 중단 신호를 �
   covers(
     "작업중 메모를 고치면 에이전트가 실제로 중단한다",
   );
+  // 실행: 그 메모의 글을 고치고 경고를 확인한 뒤 강행한다.
+  // 기대: 메모 상태가 초안이 되고, 에이전트가 그 메모 식별자를 담은 취소 신호를 받는다.
   const agent = attach(fx.server.url);
   await agent.ready;
 
@@ -83,6 +87,8 @@ test("작업중 메모를 고치면 에이전트가 실제로 중단 신호를 �
 });
 
 test("한 건을 취소해도 같은 묶음의 나머지는 계속 처리된다", async ({ page }) => {
+  // 실행: 사람이 그중 1건을 고쳐 취소시킨다.
+  // 기대: 그 1건만 초안이 되고 나머지 4건은 작업중을 유지한다.
   await makeNote(page, 30, "취소될 것");
   await makeNote(page, 80, "계속 갈 것 A");
   await makeNote(page, 130, "계속 갈 것 B");

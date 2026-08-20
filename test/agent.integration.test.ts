@@ -53,6 +53,8 @@ describe("에이전트 접점", () => {
   covers(
     "에이전트가 서버 목록 파일로 자기 영상의 주소를 찾는다",
   );
+    // 실행: 에이전트가 실행 중인 서버 목록 파일을 읽어 특정 영상의 주소를 찾아 통로에 붙는다.
+    // 기대: 그 영상의 서버에만 붙고, 다른 영상에서 보낸 묶음 신호를 받지 않는다.
     execFileSync("git", ["init", "-q"], { cwd: dir });
     const a = join(dir, "a", "out", "final.mp4");
     const b = join(dir, "b", "out", "final.mp4");
@@ -80,6 +82,8 @@ describe("에이전트 접점", () => {
   });
 
   it("새 묶음과 취소가 같은 통로로 오되 구분된다", async () => {
+    // 실행: 사람이 그 메모를 고쳐 취소가 발생하게 한다.
+    // 기대: 새 묶음 신호와 같은 통로로 취소 신호가 도착하고, 두 신호가 종류로 구분되며 취소 신호에 대상 메모 식별자가 담긴다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -109,7 +113,11 @@ describe("에이전트 접점", () => {
   });
 
   it("통로가 끊겨도 메모는 남고 재연결 후 이어받는다", async () => {
+    // 실행: 통로가 끊긴 상태로 메모 2건을 작성하고 보내기를 누른 뒤, 에이전트가 감시를 다시 건다.
+    // 기대: 끊긴 동안에도 메모 2건이 파일에 저장되고 묶음 식별자가 붙는다.
     covers("에이전트가 없어도 메모가 남고 나중에 이어받는다");
+    // 실행: 메모를 2건 쓰고 보내기를 누른다.
+    // 기대: 오류 없이 메모 2건이 파일에 저장되고 묶음 식별자가 붙는다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -133,6 +141,8 @@ describe("에이전트 접점", () => {
   });
 
   it("메모를 저장하는 것만으로는 에이전트를 부르지 않는다", async () => {
+    // 실행: 메모를 5건 연속으로 작성해 저장하되 보내기는 누르지 않는다.
+    // 기대: 5건 모두 파일에 저장되지만 에이전트에게 가는 신호는 한 번도 발생하지 않는다.
     // 쓰는 대로 계속 부르면 에이전트가 덜 쓴 메모에 반응하고, 알림이 잦으면 감시가 끊긴다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
@@ -153,6 +163,8 @@ describe("에이전트 접점", () => {
   });
 
   it("서버 없이 파일만으로 에이전트가 일할 수 있다", async () => {
+    // 실행: 저장 파일만 읽어 각 메모의 대상 프레임 구간·화면 좌표·이미지 파일을 찾아본다.
+    // 기대: 서버 없이 파일만으로 세 건 모두의 대상과 요청을 특정할 수 있고, 기록된 경로로 이미지 파일이 실제로 열린다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -178,6 +190,8 @@ describe("에이전트 접점", () => {
   covers(
     "서버가 꺼져 상태를 못 남기면 조용히 끝내지 않는다",
   );
+    // 실행: 에이전트가 상태를 반영됨으로 바꾸려 시도한다.
+    // 기대: 상태 변경이 실패하고, 에이전트가 사람에게 상태를 남기지 못했음을 알린다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -199,6 +213,8 @@ describe("에이전트 접점", () => {
   });
 
   it("리뷰 서버와 통로가 같은 네트워크에 노출되지 않는다", async () => {
+    // 실행: 다른 기기에서 서버 주소로 접속을 시도한다.
+    // 기대: 연결이 되지 않는다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 20);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -222,6 +238,8 @@ describe("에이전트 접점", () => {
   covers(
     "렌더 명령이 없으면 재렌더하지 않고 사유를 남긴다",
   );
+    // 실행: 에이전트가 메모를 받아 소스를 고친 뒤 재렌더를 시도한다.
+    // 기대: 재렌더를 실행하지 않고, 사람이 직접 렌더해야 한다는 사실이 그 메모의 상태 사유에 남는다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 20);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });

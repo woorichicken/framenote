@@ -26,12 +26,27 @@ try {
   process.exit(1);
 }
 const doc = JSON.parse(raw);
+
+/** `실행:` / `기대:` 의 **첫 문장**만 뽑는다. 전문을 요구하면 길어서 아무도 안 옮긴다. */
+function firstSentence(body, label) {
+  const m = new RegExp(`${label}\\s*:\\s*([\\s\\S]+?)(?:\\n(?:전제|실행|기대|우선순위)|$)`).exec(body ?? "");
+  if (!m) return "";
+  const text = m[1].trim().replace(/\s+/g, " ");
+  const dot = text.indexOf(". ");
+  return (dot > 0 ? text.slice(0, dot + 1) : text).trim();
+}
 const out = {
   source: doc.document?.title ?? "",
   note: "pnpm tc:sync 로 갱신한다. 손으로 고치지 않는다.",
   sections: doc.sections.map((s) => ({
     heading: s.heading,
-    cases: (s.testCases ?? []).map((t) => ({ title: t.title, type: t.testType, kind: t.tcKind })),
+    cases: (s.testCases ?? []).map((t) => ({
+      title: t.title,
+      type: t.testType,
+      kind: t.tcKind,
+      run: firstSentence(t.body, "실행"),
+      expect: firstSentence(t.body, "기대"),
+    })),
   })),
 };
 writeFileSync(join(ROOT, "docs/testcases.json"), JSON.stringify(out, null, 2) + "\n", "utf8");

@@ -68,6 +68,8 @@ afterEach(async () => {
 
 describe("경계", () => {
   it("동작 중 저장소 밖으로 나가는 요청이 없다", async () => {
+    // 실행: 영상을 열고 메모를 작성·수정·삭제하고 보내기까지 한 바퀴 돈다.
+    // 기대: 로컬 주소 밖으로 나가는 요청이 한 건도 발생하지 않는다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const watch = watchEgress();
@@ -102,6 +104,8 @@ describe("경계", () => {
   });
 
   it("왕복을 완주해도 커밋과 푸시가 일어나지 않는다", async () => {
+    // 실행: 메모를 보내고 에이전트가 소스를 고쳐 재렌더까지 완주하게 둔다.
+    // 기대: 소스 파일과 렌더 결과물은 바뀌지만 커밋이 생기지 않고 원격에 푸시되지 않는다.
     execFileSync("git", ["init", "-q"], { cwd: dir });
     execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t",
       "commit", "-q", "--allow-empty", "-m", "base"], { cwd: dir });
@@ -130,6 +134,8 @@ describe("경계", () => {
   });
 
   it("인자를 생략하면 최근 영상을 고르고 무엇을 골랐는지 알린다", () => {
+    // 실행: 파일 인자 없이 도구를 실행한다.
+    // 기대: 가장 최근에 수정된 영상이 열리고, 어떤 파일을 골랐는지 터미널에 파일 경로가 한 줄 출력된다.
     const older = join(dir, "out", "older.mp4");
     const newer = join(dir, "out", "newer.mp4");
     makeRuler(older, 20);

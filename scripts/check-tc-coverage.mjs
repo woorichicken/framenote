@@ -52,6 +52,42 @@ export function collectTitles(sources) {
   return { titles, declared };
 }
 
+/**
+ * 그 TC 를 덮는 테스트 블록의 소스를 잘라낸다.
+ *
+ * 파일 전체에서 찾으면 옆 테스트의 문장이 잡혀서 검사가 헐거워진다.
+ */
+export function blockOf(src, anchor) {
+  const at = src.indexOf(anchor);
+  if (at < 0) return "";
+  const rest = src.slice(at + anchor.length);
+  const next = rest.search(/\n\s*(?:it|test)\(/);
+  return anchor + (next < 0 ? rest : rest.slice(0, next));
+}
+
+/**
+ * TC 의 **실행·기대 문장이 그 테스트 안에 그대로 있는지** 본다.
+ *
+ * 왜: 짝이 있어도 테스트가 다른 것을 단언할 수 있다. 실제로 그랬다 — 구현을 보고 단언을
+ * 쓰면 코드가 하는 일을 확인하게 되고, 그건 언제나 초록이다(2026-08-20 실측 3건).
+ * 기대 문장을 옆에 적어야 하면 **읽지 않고는 쓸 수 없다.**
+ */
+export function checkSentences(cases, sources, titles) {
+  const missing = [];
+  for (const c of cases) {
+    const file = titles.get(c.title);
+    if (!file) continue;                       // 짝 없음은 위에서 따로 잡는다
+    const src = sources.find((s) => s.file === file)?.src ?? "";
+    // 제목으로 못 찾으면 covers 선언 자리를 기준으로 삼는다.
+    let block = blockOf(src, `"${c.title}"`);
+    if (block.length < 40) block = src;
+    const want = [["실행", c.run], ["기대", c.expect]].filter(([, t]) => t);
+    const gone = want.filter(([, t]) => !block.includes(t)).map(([label]) => label);
+    if (gone.length) missing.push({ ...c, file, gone });
+  }
+  return missing;
+}
+
 export function compare(cases, titles, declared) {
   const uncovered = cases.filter((c) => !titles.has(c.title));
   const known = new Set(cases.map((c) => c.title));
@@ -68,6 +104,7 @@ function main() {
   const { titles, declared } = collectTitles(sources);
 
   const { uncovered, dangling } = compare(cases, titles, declared);
+  const sentenceGaps = checkSentences(cases, sources, titles);
   const covered = cases.length - uncovered.length;
   console.log(`테스트케이스 ${cases.length}건 · 짝이 있는 것 ${covered}건 · 없는 것 ${uncovered.length}건`);
 
@@ -88,8 +125,20 @@ function main() {
     for (const t of dangling) console.error(`    ${t}`);
     console.error("\n제목이 바뀌었으면 pnpm tc:sync 로 스냅샷을 갱신하고 선언을 맞춘다.");
   }
-  if (uncovered.length > 0 || dangling.length > 0) process.exit(1);
-  console.log("모든 테스트케이스에 짝이 있다.");
+  if (sentenceGaps.length > 0) {
+    console.error(`\n요구사항 문장이 테스트에 없는 것 ${sentenceGaps.length}건:`);
+    for (const g of sentenceGaps) {
+      console.error(`\n  ${g.title}  (${g.file})`);
+      if (g.gone.includes("실행")) console.error(`    실행: ${g.run}`);
+      if (g.gone.includes("기대")) console.error(`    기대: ${g.expect}`);
+    }
+    console.error(
+      "\n위 문장을 그 테스트 안에 주석으로 그대로 적는다. 기대를 읽지 않고 쓴 테스트는\n" +
+      "구현이 하는 일을 확인하게 되고, 그건 언제나 초록이다.",
+    );
+  }
+  if (uncovered.length > 0 || dangling.length > 0 || sentenceGaps.length > 0) process.exit(1);
+  console.log(`모든 테스트케이스에 짝이 있고, 요구사항 문장이 테스트 안에 있다. (${cases.length}건)`);
 }
 
 const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));

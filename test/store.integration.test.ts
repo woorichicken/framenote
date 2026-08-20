@@ -37,6 +37,8 @@ afterEach(async () => {
 
 describe("저장 형식", () => {
   it("이름이 같은 두 영상의 메모가 섞이지 않는다", async () => {
+    // 실행: 두 영상을 각각 열어 메모를 1건씩 남긴다.
+    // 기대: 두 메모가 서로 다른 폴더의 서로 다른 파일에 저장된다.
     // git 저장소로 만들어 둘의 저장 루트를 같게 한다 — 그래야 키가 정말 갈리는지 본다.
     execFileSync("git", ["init", "-q"], { cwd: dir });
     const a = join(dir, "a", "out", "final.mp4");
@@ -56,6 +58,8 @@ describe("저장 형식", () => {
   });
 
   it("앞부분이 같고 뒤가 다른 두 렌더본이 구분된다", async () => {
+    // 실행: 두 파일의 렌더본 식별자를 각각 구한다.
+    // 기대: 두 식별자가 다르다.
     const base = Buffer.alloc(3 * 1024 * 1024, 7);
     const one = join(dir, "one.bin");
     const two = join(dir, "two.bin");
@@ -66,6 +70,8 @@ describe("저장 형식", () => {
   });
 
   it("영상 안 시각과 메모를 만든 때가 따로 기록된다", async () => {
+    // 실행: 저장 파일의 그 줄을 읽는다.
+    // 기대: 시각 항목이 구간 시작 프레임의 타임코드이고, 만든 때 항목이 그와 별도로 메모를 확정한 일시로 기록돼 있다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 60);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -77,6 +83,8 @@ describe("저장 형식", () => {
   });
 
   it("파일에서 읽은 프레임 레이트가 실제 메모 프레임 번호에 쓰인다", async () => {
+    // 실행: 각각을 열어 같은 재생 시각으로 이동하고 메모를 하나씩 저장한 뒤 파일을 읽는다.
+    // 기대: 서버가 파일에서 읽은 프레임 레이트가 두 영상에서 각각 다르게 잡히고, 저장된 메모의 프레임 번호가 그 레이트로 계산된 값과 일치한다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 90);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -88,6 +96,8 @@ describe("저장 형식", () => {
   });
 
   it("쓰는 중 중단돼도 앞선 메모가 깨지지 않는다", async () => {
+    // 실행: 4번째 메모를 쓰는 도중 프로세스를 강제 종료한 뒤 파일을 다시 읽는다.
+    // 기대: 앞의 3건이 손상 없이 읽힌다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -108,6 +118,8 @@ describe("저장 형식", () => {
   });
 
   it("서버를 죽였다 켜도 메모가 그대로 남는다", async () => {
+    // 실행: 서버 프로세스를 강제 종료하고 다시 실행해 같은 영상을 연다.
+    // 기대: 메모 3건이 그대로 읽히고 상태·구간·이미지 경로가 종료 전과 같다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s1 = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -124,6 +136,8 @@ describe("저장 형식", () => {
   });
 
   it("메모를 지우면 붙은 이미지 파일도 함께 지운다", async () => {
+    // 실행: 그 메모를 삭제한다.
+    // 기대: 메모가 목록과 파일에서 사라지고, 그 메모에 붙어 있던 이미지 파일 2개도 저장소에서 사라진다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -143,6 +157,8 @@ describe("저장 형식", () => {
   });
 
   it("형식 정보가 없는 이미지도 확장자로 알아본다", async () => {
+    // 실행: 메모 작성 화면에서 붙여넣는다.
+    // 기대: 파일 이름의 확장자로 이미지임을 알아보고 첨부한다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 30);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });
@@ -160,6 +176,8 @@ describe("저장 형식", () => {
   });
 
   it("복사본과 에이전트 전달본이 같은 정보를 담는다", async () => {
+    // 실행: 그 메모를 복사용 형식으로 만든 결과와, 에이전트에게 전달되는 형식으로 만든 결과를 각각 얻어 비교한다.
+    // 기대: 두 결과가 담고 있는 정보 항목의 집합이 동일하다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 60);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });

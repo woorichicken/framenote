@@ -1,0 +1,22 @@
+{
+  "version": "0.2.3",
+  "urgency": "low",
+  "summary": "용량을 넘는 이미지를 헤더만 보고 바로 거절한다. 예전에는 21MB 를 다 받고 나서 버렸다.",
+  "packageGroups": { "cli": ["framenote"] },
+  "serverPrerequisites": ["없다. 0.2.x 와 같다 — Node 22 이상, 시스템의 ffmpeg 와 ffprobe."],
+  "automaticChanges": [
+    "20MB 를 넘는 이미지를 보내면 content-length 만 보고 즉시 거절한다. 큰 파일이 메모리를 통째로 지나가지 않는다.",
+    "거절 사유는 예전과 같다 — 몇 MB 까지인지 말한다."
+  ],
+  "agentReview": [
+    "동작이 바뀌는 것은 없다. 거절되는 조건도 같다 — 언제 거절하느냐만 빨라졌다.",
+    "content-length 를 안 보내는 클라이언트는 예전처럼 본문을 읽다가 한도에서 걸린다."
+  ],
+  "verification": [
+    "21MB png 를 실제로 보내 400 과 사유를 확인하는 테스트를 넣었다. 그 테스트가 5초 타임아웃에 걸리던 것이 397ms 로 끝난다.",
+    "pnpm all — release:check · tc:check(81/81) · typecheck · 유닛/통합 61건 · build · E2E 37건."
+  ],
+  "knownIssues": [
+    "메모당 10장 제한은 여전히 저장 시점에 센다 — 한 장씩 보내므로 문제되지 않는다."
+  ]
+}

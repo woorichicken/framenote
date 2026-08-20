@@ -48,6 +48,8 @@ function capture(): { out: string[]; err: string[]; restore: () => void } {
 
 describe("진입", () => {
   it("없는 파일을 주면 창을 띄우지 않고 경로와 사유를 출력한다", async () => {
+    // 실행: 그 경로로 도구를 실행한다.
+    // 기대: 브라우저 창이 뜨지 않고, 터미널에 찾으려던 경로가 그대로 포함된 사유가 출력되며 종료된다.
     const missing = join(dir, "no-such", "clip.mp4");
     const cap = capture();
     const code = await run([missing, "--no-open"]);
@@ -61,6 +63,8 @@ describe("진입", () => {
   covers(
     "열 영상이 없으면 찾은 범위를 알리고 끝낸다",
   );
+    // 실행: 파일 인자 없이 도구를 실행한다.
+    // 기대: 창을 띄우지 않고, 어디를 어떤 확장자로 찾았는지 터미널에 출력하고 종료한다.
     mkdirSync(join(dir, "empty"), { recursive: true });
     process.chdir(join(dir, "empty"));
     const cap = capture();
@@ -73,6 +77,8 @@ describe("진입", () => {
   });
 
   it("하위 폴더는 찾되 node_modules 는 건너뛴다", () => {
+    // 실행: 파일 인자 없이 도구를 실행한다.
+    // 기대: out/ 안의 영상이 열린다.
     makeRuler(join(dir, "out", "wanted.mp4"), 20);
     // node_modules 안의 것을 더 최근으로 만든다 — 그래도 안 골라야 한다.
     makeRuler(join(dir, "node_modules", "pkg", "newer.mp4"), 20);
@@ -90,6 +96,8 @@ describe("진입", () => {
   });
 
   it("두 영상을 동시에 리뷰해도 서로 방해하지 않는다", async () => {
+    // 실행: 다른 터미널에서 다른 영상으로 도구를 한 번 더 실행한다.
+    // 기대: 먼저 뜬 인스턴스가 계속 살아 있고, 두 번째 인스턴스가 다른 포트로 떠서 자기 창을 연다.
     const a = join(dir, "a", "final.mp4");
     const b = join(dir, "b", "final.mp4");
     makeRuler(a, 20);
@@ -113,6 +121,8 @@ describe("진입", () => {
   covers(
     "프레임 레이트를 못 읽으면 메모 작성을 막고 사유를 표시한다",
   );
+    // 실행: 그 파일을 연다.
+    // 기대: 창은 열리되 메모를 남길 수 없는 상태가 되고, 화면에 프레임 레이트를 읽지 못했다는 사유가 표시된다.
     // 확장자만 영상인 쓰레기 파일 — ffprobe 가 스트림을 못 찾는다.
     const broken = join(dir, "out", "broken.mp4");
     mkdirSync(dirname(broken), { recursive: true });
@@ -135,6 +145,8 @@ describe("진입", () => {
   covers(
     "확정 전 내용은 파일에 쓰이지 않는다",
   );
+    // 실행: 구간과 네모를 잡고 글을 절반쯤 쓴 상태에서 저장을 확정하지 않은 채 저장 파일을 확인한다.
+    // 기대: 저장 파일에 줄이 하나도 추가되지 않았다.
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 20);
     const s = await startServer({ videoPath: v, playerDir: PLAYER });

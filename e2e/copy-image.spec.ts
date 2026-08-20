@@ -26,6 +26,8 @@ const pasteImage = (page: Page, name = "shot.png", type = "image/png"): Promise<
 test.afterEach(async () => { await fx?.cleanup(); });
 
 test("씬 정보를 못 읽으면 generic으로 낮추고 알린다", async ({ page }) => {
+  // 실행: 그 영상을 연다.
+  // 기대: 영상 종류가 generic으로 낮춰져 표시되고, 낮춘 사유가 화면에 보인다.
   // 씬 목록이 규격에서 벗어나면 절반만 맞는 경계를 그리지 않고 통째로 버린다.
   fx = await bootFixture({ frames: 120, scenes: [{ name: "", startFrame: -5 } as never] });
   const warnings: string[] = [];
@@ -39,6 +41,8 @@ test("씬 정보를 못 읽으면 generic으로 낮추고 알린다", async ({ p
 });
 
 test("커서가 입력칸 밖이어도 이미지 붙여넣기가 된다", async ({ page }) => {
+  // 실행: 붙여넣기 단축키를 누른다.
+  // 기대: 이미지가 첨부되어 미리보기에 나타난다.
   fx = await bootFixture({ frames: 120 });
   await page.goto(fx.server.url);
   await waitReady(page);
@@ -58,6 +62,8 @@ test("커서가 입력칸 밖이어도 이미지 붙여넣기가 된다", async 
 });
 
 test("세 가지 경로로 이미지를 여러 장 붙일 수 있다", async ({ page }) => {
+  // 실행: 이미지 3장을 붙여넣기·끌어다 놓기·파일 고르기로 각각 하나씩 첨부한다.
+  // 기대: 3장이 모두 첨부되어 미리보기에 나열되고, 저장하면 메모의 이미지 목록에 3개 경로가 기록된다.
   // 앞선 이 테스트는 붙여넣기만 두 번 하고 "세 경로"라고 했다 — 파일 고르기가 아예 구현돼
   // 있지 않은 것을 놓쳤다(실사용 2026-08-20에 드러났다). 이제 셋을 각각 쓴다.
   fx = await bootFixture({ frames: 120 });
@@ -118,6 +124,8 @@ test("이미지 없는 붙여넣기는 왜 안 붙었는지 말한다", async ({
 });
 
 test("이미지가 아닌 붙여넣기는 글로 들어간다", async ({ page }) => {
+  // 실행: 글 입력칸에 커서를 두고 붙여넣는다.
+  // 기대: 텍스트가 글 입력칸에 그대로 들어가고 이미지 첨부가 일어나지 않는다.
   fx = await bootFixture({ frames: 120 });
   await page.goto(fx.server.url);
   await waitReady(page);
@@ -133,6 +141,8 @@ test("이미지가 아닌 붙여넣기는 글로 들어간다", async ({ page })
 });
 
 test("여러 건을 골라 복사하면 좌표와 이미지 경로가 함께 담긴다", async ({ page, context }) => {
+  // 실행: 선택한 것을 복사한다.
+  // 기대: 클립보드에 2건만 담기고, 각 건에 프레임 구간·씬·좌표·렌더본과 이미지 파일 경로가 포함된다.
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   fx = await bootFixture({ frames: 200 });
   await page.goto(fx.server.url);
@@ -158,6 +168,8 @@ test("여러 건을 골라 복사하면 좌표와 이미지 경로가 함께 담
 });
 
 test("복사본만으로 에이전트가 대상을 특정할 수 있다", async ({ page, context }) => {
+  // 실행: 복사한 내용만 코딩 에이전트에게 전달한다.
+  // 기대: 에이전트가 그 텍스트만으로 대상 프레임 구간과 화면 위치를 특정하고, 붙은 이미지 파일을 경로로 찾아 열 수 있다.
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   fx = await bootFixture({ frames: 200 });
   await page.goto(fx.server.url);
@@ -176,6 +188,8 @@ test("복사본만으로 에이전트가 대상을 특정할 수 있다", async 
 });
 
 test("클립보드가 거부되면 실패를 알리고 대체 수단을 준다", async ({ page }) => {
+  // 실행: 메모를 골라 복사를 누른다.
+  // 기대: 복사에 실패했다는 안내가 표시되고, 같은 내용을 직접 고를 수 있는 대체 수단이 함께 제시된다.
   fx = await bootFixture({ frames: 120 });
   await page.addInitScript(() => {
     // 브라우저가 클립보드 쓰기를 거부하는 상황을 만든다.
@@ -199,6 +213,8 @@ test("클립보드가 거부되면 실패를 알리고 대체 수단을 준다",
 });
 
 test("프레임을 확정할 수 없는 브라우저에서는 메모 작성을 잠근다", async ({ page }) => {
+  // 실행: 영상을 연다.
+  // 기대: 창은 열리되 메모 작성이 잠기고, 프레임 정확도를 보장할 수 없다는 사유와 지원되는 브라우저 안내가 표시된다.
   fx = await bootFixture({ frames: 120 });
   await page.addInitScript(() => {
     // 그려진 프레임을 알려주는 수단이 없는 브라우저를 흉내낸다.

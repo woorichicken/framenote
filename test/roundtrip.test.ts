@@ -67,6 +67,10 @@ describe("왕복", () => {
     "mp4를 열면 창 하나에 규격과 렌더본이 표시된다",
     "Remotion이 아닌 영상도 열리고 프레임만 표시된다",
   );
+    // 실행: 그 영상을 연다.
+    // 기대: 영상 종류가 generic으로 표시되고, 스크러버에 씬 구분이 없으며 프레임 번호와 시간만 표시된다.
+    // 실행: 그 파일 경로를 인자로 주고 도구를 실행한다.
+    // 기대: 브라우저 창이 정확히 1개 열리고, 창에 가로x세로 1920x1080, 30fps, 총 1800프레임, 렌더본 식별자 7자가 표시된다.
     const { body } = await api("/api/info");
     expect(body.info.fps).toBe(30);
     expect(body.info.totalFrames).toBe(60);
@@ -80,6 +84,10 @@ describe("왕복", () => {
     "열기에서 계산한 렌더본이 이후 모든 메모에 실제로 붙는다",
     "메모 한 건이 규정된 항목을 모두 담아 한 줄로 저장된다",
   );
+    // 실행: 구간·좌표·씬·글·이미지가 모두 채워진 메모를 1건 저장한다.
+    // 기대: 메모 파일에 한 줄이 추가되고, 그 줄에 식별자·구간·시각·좌표·좌표 프레임·씬·무엇이·어떻게·이미지 경로·렌더본·영상 종류·상태가 모두 담긴다.
+    // 실행: 그 상태에서 메모를 2건 작성해 저장하고 파일을 읽는다.
+    // 기대: 두 메모 모두에 창에 표시된 것과 같은 렌더본 식별자가 기록돼 있다.
     const { status, body } = await api("/api/notes", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -103,6 +111,8 @@ describe("왕복", () => {
   covers(
     "무엇이 칸이 비면 저장을 거부한다",
   );
+    // 실행: 무엇이 칸을 비운 채 저장을 시도한다.
+    // 기대: 저장되지 않고 무엇이 칸을 채우라는 안내가 표시된다.
     const before = (await api("/api/notes")).body.length;
     const { status } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -116,6 +126,8 @@ describe("왕복", () => {
   covers(
     "어떻게를 비워도 저장되고 이미지·구간을 유도한다",
   );
+    // 실행: 무엇이 칸만 채우고 어떻게 칸은 비운 채 저장한다.
+    // 기대: 메모가 저장되고, 화면에 구간을 잡거나 이미지를 붙이라는 안내가 표시된다.
     const { status, body } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: [50, 50], what: "여기가 어색하다" }),
@@ -130,6 +142,12 @@ describe("왕복", () => {
     "신호에는 묶음 식별자와 건수만 담긴다",
     "보내기를 누르면 감시 중인 에이전트가 실제로 받아 집는다",
   );
+    // 실행: 메모 1건을 작성하고 보내기를 누른다.
+    // 기대: 에이전트가 신호를 받아 그 묶음의 메모 전문을 읽어오고, 해당 메모의 상태가 작업중으로 바뀐다.
+    // 실행: 보내기를 누르고 에이전트에게 도달한 신호의 내용을 확인한다.
+    // 기대: 신호에 묶음 식별자와 건수만 담겨 있다.
+    // 실행: 보내기를 한 번 누른다.
+    // 기대: 3건 모두 상태가 보냄으로 바뀌고 같은 묶음 식별자가 붙는다.
     const ws = new WebSocket(`${server.url.replace("http", "ws")}/feed`);
     const signal = new Promise<any>((res, rej) => {
       const timer = setTimeout(() => rej(new Error("신호가 안 왔다")), 5000);
@@ -163,6 +181,10 @@ describe("왕복", () => {
     "파일로 읽은 것과 서버로 읽은 것이 같은 값을 준다",
     "화면에서 만든 메모가 파일에 손실 없이 기록된다",
   );
+    // 실행: 저장 파일을 직접 읽은 결과와, 서버에 묶음 식별자로 물어본 결과를 비교한다.
+    // 기대: 두 결과가 같은 메모 2건을 주고, 각 항목의 값이 모두 동일하다.
+    // 실행: 화면에서 구간·좌표·글·이미지를 채워 메모를 저장한 뒤, 도구를 거치지 않고 저장 파일을 직접 읽는다.
+    // 기대: 파일에 기록된 구간·좌표·글·이미지 경로가 화면에서 입력한 값과 정확히 일치한다.
     // git 저장소가 아니면 영상이 있는 디렉터리가 최상단이다.
     const file = join(dir, "out", ".framenote", "final.mp4", "notes.jsonl");
     expect(existsSync(file)).toBe(true);
@@ -173,6 +195,8 @@ describe("왕복", () => {
   });
 
   it("메모를 개별 지정하지 않은 상태 변경은 거부한다", async () => {
+    // 실행: 에이전트가 메모를 하나하나 지정하지 않고 묶음 전체를 반영됨으로 바꾸도록 요청한다.
+    // 기대: 요청이 거부되고 어느 메모도 반영됨이 되지 않는다.
     const { status } = await api("/api/status", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ batch: batchId, status: "applied" }),
@@ -181,9 +205,13 @@ describe("왕복", () => {
   });
 
   it("한 요청에 반영됨과 실패를 섞어 보낼 수 있다", async () => {
+    // 실행: 에이전트가 3건은 반영됨, 2건은 실패로 한 번의 요청에 담아 보낸다.
+    // 기대: 3건이 반영됨, 2건이 실패가 되고 실패 2건에 각각 사유가 남는다.
   covers(
     "실패 메모도 재렌더 후 낡음으로 넘어간다",
   );
+    // 실행: 영상이 렌더본 B 로 교체된다.
+    // 기대: 초안·보냄·실패 세 건이 낡음이 된다.
     const sent: Note[] = (await api(`/api/notes?batch=${batchId}`)).body;
     const [a, b] = sent;
     const { status, body } = await api("/api/status", {
@@ -216,6 +244,8 @@ describe("왕복", () => {
   covers(
     "렌더 출력 경로가 달라도 영상이 교체된다",
   );
+    // 실행: 에이전트가 재렌더를 마치고 상태를 반영됨으로 바꾸면서 새 파일 경로를 함께 알린다.
+    // 기대: 창의 영상이 그 새 경로의 파일로 교체되고 렌더본 식별자가 갱신된다.
     const { body } = await api("/api/info");
     expect(body.video).toBe(video2);
     expect(body.info.totalFrames).toBe(90); // 새 렌더본의 규격을 다시 읽는다
@@ -226,6 +256,8 @@ describe("왕복", () => {
   covers(
     "이미지는 별도 파일로 저장되고 메모에는 경로만 들어간다",
   );
+    // 실행: 메모 파일과 저장소의 이미지 파일을 확인한다.
+    // 기대: 이미지가 별도 파일 2개로 저장되고 메모 줄에는 그 경로만 들어간다.
     const { body: created } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: [3, 3], what: "이미지 붙은 메모" }),
@@ -253,16 +285,31 @@ describe("왕복", () => {
   covers(
     "받을 수 없는 이미지는 사유를 표시한다",
   );
+    // 실행: 25MB 짜리 png 를 붙이고, 이어서 형식도 확장자도 알 수 없는 파일을 붙인다.
+    // 기대: 두 경우 모두 첨부되지 않고 각각 왜 못 받았는지 화면에 표시된다.
     const { body: created } = await api("/api/notes", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ range: [4, 4], what: "형식 시험" }),
     });
+    // ① 용량을 넘는 이미지 — 한 장 최대 20MB
+    const tooBig = Buffer.alloc(21 * 1024 * 1024, 0);
+    const bigRes = await fetch(`${server.url}/api/notes/${created.id}/images?name=big.png`, {
+      method: "POST", headers: { "content-type": "image/png" }, body: tooBig,
+    });
+    expect(bigRes.status).toBe(400);
+    expect((await bigRes.json()).error).toContain("MB");     // 왜 못 받았는지 말한다
+
+    // ② 형식도 확장자도 알 수 없는 파일
     const res = await fetch(`${server.url}/api/notes/${created.id}/images?name=noext`, {
       method: "POST", headers: { "content-type": "application/octet-stream" }, body: Buffer.from("x"),
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("형식");
-  });
+
+    // 둘 다 안 붙었다.
+    const after = (await api(`/api/notes`)).body as Note[];
+    expect(after.find((n) => n.id === created.id)!.images).toHaveLength(0);
+  }, 30_000);   // 21MB 를 실제로 보낸다
 
   it("리뷰 서버가 로컬 밖으로 열려 있지 않다", () => {
     expect(server.url.startsWith("http://127.0.0.1:")).toBe(true);

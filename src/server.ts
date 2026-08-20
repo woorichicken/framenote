@@ -256,6 +256,11 @@ export async function startServer(opts: {
       if (found.images.length >= MAX_IMAGES_PER_NOTE) {
         return json(res, 400, { error: `이미지는 메모당 ${MAX_IMAGES_PER_NOTE}장까지입니다.` });
       }
+      // 헤더로 먼저 거절한다 — 다 받고 나서 버리면 큰 파일이 그대로 메모리를 지난다.
+      const declared = Number(req.headers["content-length"] ?? NaN);
+      if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) {
+        return json(res, 400, { error: `이미지는 한 장에 ${MAX_IMAGE_BYTES / 1024 / 1024}MB까지입니다.` });
+      }
       let raw: Buffer;
       try {
         raw = await readBody(req, MAX_IMAGE_BYTES + 1024);
