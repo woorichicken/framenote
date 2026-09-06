@@ -29,12 +29,14 @@ export interface Fixture {
 
 export async function bootFixture(opts?: {
   frames?: number;
+  /** 영상 크기. 창보다 큰 영상이어야 "창을 줄이면 영상도 줄어든다"를 검사할 수 있다. */
+  size?: string;
   scenes?: { name: string; startFrame: number }[];
   previewCommand?: string;
 }): Promise<Fixture> {
   const dir = mkdtempSync(join(tmpdir(), "framenote-e2e-"));
   const video = join(dir, "out", "final.mp4");
-  makeRuler(video, opts?.frames ?? 200);
+  makeRuler(video, opts?.frames ?? 200, opts?.size ?? "640x360");
 
   if (opts?.scenes || opts?.previewCommand) {
     // 설정은 **저장 루트** 기준이다. git 저장소가 아니면 영상이 있는 디렉터리가 루트다.

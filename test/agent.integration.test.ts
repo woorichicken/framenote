@@ -248,6 +248,33 @@ describe("에이전트 접점", () => {
     expect(info.previewCommand).toBeNull();   // 설정이 없으면 null — 짐작하지 않는다
   });
 
+  it("작업중 메모를 지우면 에이전트가 중단 신호를 받는다", async () => {
+    // 실행: 그 메모를 지운다.
+    // 기대: 에이전트 통로로 그 메모 식별자를 담은 취소 신호가 간다.
+    const v = join(dir, "out", "final.mp4");
+    makeRuler(v, 20);
+    const s = await startServer({ videoPath: v, playerDir: PLAYER });
+    servers.push(s);
+    const agent = attach(s.url);
+    await agent.ready;
+
+    const n = await post(s, { range: [3, 3], what: "지워질 것" });
+    await fetch(`${s.url}/api/send`, { method: "POST" });
+    await fetch(`${s.url}/api/status`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ updates: [{ noteId: n.id, status: "working" }] }),
+    });
+
+    await fetch(`${s.url}/api/notes?ids=${n.id}`, { method: "DELETE" });
+    await settle();
+    // 안 알리면 에이전트가 이미 없는 메모를 두고 계속 일한다.
+    const cancels = agent.got.filter((g) => (g as { type: string }).type === "cancel");
+    expect(cancels).toHaveLength(1);
+    expect((cancels[0] as { noteId: string }).noteId).toBe(n.id);
+    expect(readNotes(dirname(v), v)).toHaveLength(0);
+    agent.close();
+  });
+
   it("렌더 명령이 있으면 그것만 알려준다 — 최종 렌더 명령은 없다", async () => {
     const v = join(dir, "out", "final.mp4");
     makeRuler(v, 20);

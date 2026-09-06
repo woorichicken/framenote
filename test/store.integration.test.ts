@@ -175,6 +175,71 @@ describe("저장 형식", () => {
     expect(((await res.json()) as Note).images[0]).toMatch(/\.png$/);
   });
 
+  it("지울 메모를 지정하지 않으면 아무것도 지우지 않는다", async () => {
+    // 실행: 지울 식별자 없이 일괄 삭제를 요청한다.
+    // 기대: 요청이 사유와 함께 거절되고 메모가 한 건도 지워지지 않는다.
+    const v = join(dir, "out", "final.mp4");
+    makeRuler(v, 30);
+    const s = await startServer({ videoPath: v, playerDir: PLAYER });
+    servers.push(s);
+    await post(s, { range: [1, 1], what: "남을 것 A" });
+    await post(s, { range: [2, 2], what: "남을 것 B" });
+
+    // 빈 값을 "전부"로 읽으면 오타 한 번에 전부 사라진다. 그래서 거절한다.
+    for (const query of ["", "?ids=", "?ids=,,"]) {
+      const res = await fetch(`${s.url}/api/notes${query}`, { method: "DELETE" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toContain("ids");
+    }
+    expect(readNotes(dirname(v), v)).toHaveLength(2);
+  });
+
+  it("이미 없는 메모가 섞여도 나머지는 지우고 건너뛴 것을 알린다", async () => {
+    // 실행: 있는 메모 2건과 없는 식별자 1건을 함께 지운다.
+    // 기대: 있는 2건이 지워지고 응답에 건너뛴 식별자가 담긴다.
+    const v = join(dir, "out", "final.mp4");
+    makeRuler(v, 30);
+    const s = await startServer({ videoPath: v, playerDir: PLAYER });
+    servers.push(s);
+    const a = await post(s, { range: [1, 1], what: "지울 것 A" });
+    const b = await post(s, { range: [2, 2], what: "지울 것 B" });
+    const c = await post(s, { range: [3, 3], what: "남을 것" });
+
+    const res = await fetch(`${s.url}/api/notes?ids=${a.id},zzzznone,${b.id}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deleted: string[]; missing: string[] };
+    expect(body.deleted.sort()).toEqual([a.id, b.id].sort());
+    expect(body.missing).toEqual(["zzzznone"]);           // 조용히 넘기지 않는다
+    expect(readNotes(dirname(v), v).map((n) => n.id)).toEqual([c.id]);
+  });
+
+  it("일괄 삭제도 붙은 이미지를 함께 지운다", async () => {
+    // 실행: 그 2건을 한 번에 지운다.
+    // 기대: 두 메모와 붙어 있던 이미지 파일이 모두 사라진다.
+    const v = join(dir, "out", "final.mp4");
+    makeRuler(v, 30);
+    const s = await startServer({ videoPath: v, playerDir: PLAYER });
+    servers.push(s);
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64");
+    const paths: string[] = [];
+    const ids: string[] = [];
+    for (const what of ["이미지 붙은 것 A", "이미지 붙은 것 B"]) {
+      const n = await post(s, { range: [1, 1], what });
+      const withImg = (await (await fetch(`${s.url}/api/notes/${n.id}/images?name=a.png`, {
+        method: "POST", headers: { "content-type": "image/png" }, body: png,
+      })).json()) as Note;
+      const file = join(dirname(v), ".framenote", "final.mp4", withImg.images[0]!);
+      expect(existsSync(file)).toBe(true);
+      paths.push(file); ids.push(n.id);
+    }
+
+    await fetch(`${s.url}/api/notes?ids=${ids.join(",")}`, { method: "DELETE" });
+    expect(readNotes(dirname(v), v)).toHaveLength(0);
+    for (const file of paths) expect(existsSync(file)).toBe(false);
+  });
+
   it("복사본과 에이전트 전달본이 같은 정보를 담는다", async () => {
     // 실행: 그 메모를 복사용 형식으로 만든 결과와, 에이전트에게 전달되는 형식으로 만든 결과를 각각 얻어 비교한다.
     // 기대: 두 결과가 담고 있는 정보 항목의 집합이 동일하다.

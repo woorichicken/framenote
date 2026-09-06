@@ -16,7 +16,7 @@ let pending = null;        // 작성 중인 네모
 let pendingFrame = null;
 let current = null;        // 목록에서 고른 메모 id
 let pendingImages = [];    // 저장 전에 붙인 이미지
-const picked = new Set();  // 복사하려고 고른 메모
+const picked = new Set();  // 복사·삭제하려고 고른 메모
 
 const FRAME_OK = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
 
@@ -218,7 +218,7 @@ function paintNotes() {
     const span = n.range[0] === n.range[1] ? `f${n.range[0]}` : `f${n.range[0]}–${n.range[1]}`;
     el.innerHTML =
       `<div class="nr"><input type="checkbox" class="pick" data-id="${n.id}"` +
-      `${picked.has(n.id) ? " checked" : ""} title="복사할 메모 고르기">` +
+      `${picked.has(n.id) ? " checked" : ""} title="고른 메모를 한 번에 복사·삭제합니다">` +
       `<span class="dot ${n.status}"></span>${n.id.slice(0, 4)} · ${span} · ${KO[n.status]}` +
       `${n.scene ? " · " + n.scene : ""}</div><div class="nw"></div>` +
       (n.want ? `<div class="nt"></div>` : "") +
@@ -231,7 +231,7 @@ function paintNotes() {
     el.querySelector(".pick").onchange = (e) => {
       e.stopPropagation();
       if (e.target.checked) picked.add(n.id); else picked.delete(n.id);
-      paintCopyLabel();
+      paintPicked();
     };
 
     const acts = document.createElement("div");
@@ -253,7 +253,7 @@ function paintNotes() {
   $("counts").textContent = `${open.length}건`;
   // 목록에서 사라진 메모는 선택도 풀어준다.
   for (const id of [...picked]) if (!open.some((n) => n.id === id)) picked.delete(id);
-  paintCopyLabel();
+  paintPicked();
   const sendable = notes.filter((n) => n.status === "draft" || n.status === "failed").length;
   $("send").disabled = sendable === 0;
   $("send").textContent = sendable ? `에이전트에게 보내기 (${sendable})` : "보낼 메모 없음";
@@ -543,9 +543,43 @@ $("send").onclick = async () => {
   } catch (e) { alert(e.message); }
 };
 
-function paintCopyLabel() {
+/** 고른 메모에 딸린 표시를 한 번에 맞춘다 — 복사·삭제 라벨과 「모두」 체크. */
+function paintPicked() {
+  const open = notes.filter((n) => n.status !== "closed");
   $("copy").textContent = picked.size ? `복사 (${picked.size})` : "복사";
+  $("del").textContent = picked.size ? `삭제 (${picked.size})` : "삭제";
+  $("del").disabled = picked.size === 0;
+  const all = $("pickAll");
+  all.disabled = open.length === 0;
+  all.checked = open.length > 0 && picked.size === open.length;
+  // 일부만 골랐으면 반쯤 켠 상태로 둔다. 꺼진 채로 두면 "아무것도 안 골랐다"로 읽힌다.
+  all.indeterminate = picked.size > 0 && picked.size < open.length;
 }
+
+$("pickAll").onchange = (e) => {
+  picked.clear();
+  if (e.target.checked) for (const n of notes) if (n.status !== "closed") picked.add(n.id);
+  paintNotes();
+};
+
+/**
+ * 고른 메모를 한 번에 지운다.
+ *
+ * 한 건씩 지우는 것과 결과는 같지만 요청이 하나다 — 여러 번 나눠 보내면 중간에 실패했을 때
+ * 몇 건이 지워졌는지 화면과 파일이 갈라진다. 되돌릴 수 없어서 건수를 보여주고 한 번 더 묻는다.
+ */
+$("del").onclick = async () => {
+  if (picked.size === 0) return;
+  const ids = [...picked];
+  if (!confirm(`고른 메모 ${ids.length}건을 지웁니다. 붙인 이미지도 함께 지워지고 되돌릴 수 없습니다. 계속할까요?`)) return;
+  try {
+    const r = await api(`/api/notes?ids=${ids.join(",")}`, { method: "DELETE" });
+    picked.clear();
+    await refresh();
+    // 못 지운 것이 있으면 조용히 넘기지 않는다. 화면에서만 사라지면 지운 줄 안다.
+    if (r?.missing?.length) alert(`${r.missing.length}건은 이미 없어서 건너뛰었습니다.`);
+  } catch (e) { alert(e.message); }
+};
 
 $("copy").onclick = async () => {
   // 글은 서버에서 받는다. 여기서 조립하면 에이전트가 받는 것과 갈라진다.
@@ -566,6 +600,10 @@ $("copy").onclick = async () => {
     ta.onblur = () => ta.remove();
   }
 };
+
+// 창 크기가 바뀌면 영상 상자가 달라진다. 표식은 그 상자를 기준으로 그려 놓은 것이라
+// 다시 그리지 않으면 엉뚱한 자리에 남는다.
+window.addEventListener("resize", paintMarks);
 
 // ── 갱신 ──────────────────────────────────────────────────
 async function refresh() {

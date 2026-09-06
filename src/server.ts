@@ -109,6 +109,24 @@ export async function startServer(opts: {
   const notes = (): Note[] => readNotes(storeRoot, videoPath);
   const save = (all: Note[]): void => writeNotes(storeRoot, videoPath, all);
 
+  /**
+   * 메모를 지운다 — 한 건이든 여러 건이든 이 길 하나로 간다.
+   *
+   * 파일은 **한 번만** 다시 쓴다. 건별로 나눠 쓰면 중간에 죽었을 때 몇 건이 지워졌는지
+   * 화면과 파일이 갈라진다. 작업중이던 메모는 에이전트에게 멈추라고 알린다 — 안 알리면
+   * 이미 없는 메모를 두고 계속 일한다.
+   */
+  const deleteNotes = (all: Note[], targets: readonly Note[]): void => {
+    if (targets.length === 0) return;
+    const ids = new Set(targets.map((n) => n.id));
+    for (const n of targets) {
+      removeImages(storeRoot, videoPath, n);
+      if (n.status === "working") hub.broadcast({ type: "cancel", noteId: n.id });
+    }
+    save(all.filter((n) => !ids.has(n.id)));
+    pushSse({ type: "notes-changed" });
+  };
+
   const server: Server = createServer((req, res) => {
     void handle(req, res).catch((e: unknown) => {
       if (!res.headersSent) json(res, 500, { error: (e as Error).message });
@@ -198,6 +216,19 @@ export async function startServer(opts: {
       return json(res, 201, note);
     }
 
+    if (path === "/api/notes" && req.method === "DELETE") {
+      const want = url.searchParams.get("ids");
+      // ids 가 없으면 아무것도 안 지운다. 빈 값을 "전부"로 읽으면 오타 한 번에 전부 사라진다.
+      const ids = new Set((want ?? "").split(",").map((s) => s.trim()).filter((s) => s !== ""));
+      if (ids.size === 0) return json(res, 400, { error: "지울 메모를 ids 로 지정해야 합니다." });
+      const all = notes();
+      const targets = all.filter((n) => ids.has(n.id));
+      // 이미 없는 것은 실패가 아니지만 조용히 넘기지도 않는다 — 몇 건이 건너뛰어졌는지 돌려준다.
+      const missing = [...ids].filter((id) => !targets.some((n) => n.id === id));
+      deleteNotes(all, targets);
+      return json(res, 200, { deleted: targets.map((n) => n.id), missing });
+    }
+
     const noteMatch = /^\/api\/notes\/([A-Za-z0-9]+)$/.exec(path);
     if (noteMatch) {
       const id = noteMatch[1]!;
@@ -240,9 +271,7 @@ export async function startServer(opts: {
       }
 
       if (req.method === "DELETE") {
-        removeImages(storeRoot, videoPath, found);
-        save(all.filter((n) => n.id !== id));
-        pushSse({ type: "notes-changed" });
+        deleteNotes(all, [found]);
         return json(res, 200, { ok: true });
       }
     }
