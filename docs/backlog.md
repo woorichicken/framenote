@@ -85,3 +85,31 @@
 1. 실사용 30건에서 메모당 이미지 수와 총 용량
 2. 한 저장소를 두 사람이 리뷰하는 경우가 실제로 있는가(있으면 담는 쪽이 맞다)
 3. 담기로 하면 `git status` 오염을 어떻게 줄일지 — 확정 전 임시 저장을 어디에 둘까
+
+---
+
+## 설정이 저장소당 하나라 영상이 여럿이면 씬이 섞인다
+
+**지금**: `.framenote/config.json` 은 저장 루트(영상 위치에서 위로 찾은 git 최상단)에 **하나**다
+(`src/paths.ts` 의 `findStoreRoot` · `configFileFor`). 메모 폴더는 영상마다 나뉘는데, `scenes` 와
+`previewCommand` 는 그 저장소의 모든 영상에 똑같이 적용된다.
+
+**언제 걸렸나 (실측 2026-09-15)**: brand 저장소에 EFM 모션코믹 설정이 커밋돼 있다 —
+`scenes` 11개와 `previewCommand: pnpm --dir brand-kit/videos/efm-hr-motion-comic render:preview -- B v5`.
+같은 저장소의 다른 영상(`brand-kit/videos/artemis-dark-lab/exports/r1/artemis-dark-lab-r1.mp4`, 11장면)을
+열면 **EFM 씬 이름이 붙고 EFM 재렌더 명령이 그 영상의 것처럼 보인다.** 에러는 안 난다 — 메모가
+엉뚱한 씬에 붙은 채로 에이전트에게 간다. 저장소 설정을 그 영상 것으로 바꾸면 이번엔 EFM 이 틀린다.
+우회: 저장소 밖 폴더(`~/Downloads/creative-library/reports/feedback-artemis-dark-lab-video-r1`)에
+영상 심링크와 전용 `config.json` 을 두고 띄웠다. 심링크 경로로 저장 루트를 정하므로 된다.
+
+**왜 지금 안 하나**: 우회로 이번 리뷰는 막히지 않는다. 조회 순서를 바꾸면 기존 저장소(EFM)의
+동작이 바뀌지 않는지 테스트로 먼저 지켜야 한다 — 문서·TC 를 먼저 쓰고 구현하는 저장소 규칙이다.
+
+**착수 전 확인할 것**
+1. 조회 순서 — 영상별 설정(`.framenote/<영상 키>/config.json`) → 없으면 저장소 설정. 또는 저장소
+   설정에 영상 경로별 항목을 둘지. 기존 한 파일짜리 저장소가 그대로 동작해야 한다
+2. 영상별 설정이 없는데 저장소 설정의 씬 경계가 그 영상 길이를 넘을 때 경고할지
+   (지금 ARTEMIS 1980프레임 · EFM 설정의 마지막 씬 시작 프레임 비교 같은 검사)
+3. `previewCommand` 도 영상별로 가를지 — 다른 영상의 재렌더 명령이 실행되는 게 더 큰 사고다
+
+**착수 트리거**: 한 저장소에서 두 번째 영상을 framenote 로 리뷰할 때. brand 저장소는 이미 해당한다.
