@@ -20,6 +20,11 @@ const picked = new Set();  // 복사·삭제하려고 고른 메모
 
 const FRAME_OK = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
 
+// 서버 없이 파일 한 장으로 연 경우. 접점(`/api/...`)은 static-adapter.js 가 가로채므로 여기서
+// 갈라지는 것은 **서버 주소로만 되는 것 셋**뿐이다: 영상 파일, 첨부 이미지, 알림 통로.
+const STATIC = window.__FRAMENOTE_STATIC__ ?? null;
+const FILE_BASE = STATIC ? STATIC.fileBase : "/";
+
 const api = async (path, opts) => {
   const res = await fetch(path, opts);
   const body = res.status === 204 ? null : await res.json().catch(() => null);
@@ -223,7 +228,7 @@ function paintNotes() {
       `${n.scene ? " · " + n.scene : ""}</div><div class="nw"></div>` +
       (n.want ? `<div class="nt"></div>` : "") +
       (n.failureReason ? `<div class="nf"></div>` : "") +
-      (n.images.length ? `<div class="thumbs">${n.images.map((p) => `<img src="/${p}" alt="">`).join("")}</div>` : "");
+      (n.images.length ? `<div class="thumbs">${n.images.map((p) => `<img src="${FILE_BASE}${p}" alt="">`).join("")}</div>` : "");
     el.querySelector(".nw").textContent = n.what;
     if (n.want) el.querySelector(".nt").textContent = n.want;
     if (n.failureReason) el.querySelector(".nf").textContent = n.failureReason;
@@ -256,7 +261,9 @@ function paintNotes() {
   paintPicked();
   const sendable = notes.filter((n) => n.status === "draft" || n.status === "failed").length;
   $("send").disabled = sendable === 0;
-  $("send").textContent = sendable ? `에이전트에게 보내기 (${sendable})` : "보낼 메모 없음";
+  // 정적 파일에는 받을 에이전트가 없다. 같은 버튼이 파일을 꺼내 준다 — 그 사실을 글자로 말한다.
+  const sendLabel = STATIC ? "메모 파일로 내보내기" : "에이전트에게 보내기";
+  $("send").textContent = sendable ? `${sendLabel} (${sendable})` : "보낼 메모 없음";
   paintMarks();
 }
 
@@ -632,7 +639,7 @@ async function loadInfo(keepFrame) {
   buildSegs();
   paintNoteHere();
   // 같은 창에서 영상을 갈아 끼울 때 보던 프레임을 유지한다. 새 창을 띄우지 않는다.
-  v.src = `/video?r=${INFO.info.render}`;
+  v.src = STATIC ? STATIC.videoSrc : `/video?r=${INFO.info.render}`;
   await new Promise((r) => v.addEventListener("loadeddata", r, { once: true }));
   trackFrames();
   await seekToFrame(prev);

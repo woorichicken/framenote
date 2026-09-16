@@ -144,7 +144,7 @@ describe("경계", () => {
     utimesSync(older, new Date(1_700_000_000_000), new Date(1_700_000_000_000));
     utimesSync(newer, new Date(1_800_000_000_000), new Date(1_800_000_000_000));
 
-    const picked = resolveVideo({ video: null, port: undefined, open: false, help: false }, dir);
+    const picked = resolveVideo({ video: null, port: undefined, open: false, help: false, static: false, out: null }, dir);
     expect("error" in picked).toBe(false);
     if ("error" in picked) return;
     expect(picked.video).toBe(newer);                    // 최근 것

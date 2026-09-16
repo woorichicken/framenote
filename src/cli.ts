@@ -3,8 +3,13 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
+import { readProjectConfig } from "./config.js";
 import { VIDEO_EXTS, pickLatestVideo } from "./discover.js";
+import { readNotes } from "./notes.js";
+import { findStoreRoot, notesFileFor, storeDirFor } from "./paths.js";
 import { startServer } from "./server.js";
+import { defaultOutPath, exportStatic } from "./static.js";
+import { readVideoInfo } from "./video.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -13,14 +18,20 @@ export interface CliOptions {
   port: number | undefined;
   open: boolean;
   help: boolean;
+  /** 서버를 띄우지 않고 파일 한 장으로 내보낸다. */
+  static: boolean;
+  /** 내보낼 파일 경로. `--static` 과 함께만 쓴다. */
+  out: string | null;
 }
 
 export function parseCliArgs(argv: readonly string[]): CliOptions {
-  const o: CliOptions = { video: null, port: undefined, open: true, help: false };
+  const o: CliOptions = { video: null, port: undefined, open: true, help: false, static: false, out: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "-h" || a === "--help") o.help = true;
     else if (a === "--no-open") o.open = false;
+    else if (a === "--static") o.static = true;
+    else if (a === "--out") { o.out = argv[++i] ?? null; }
     else if (a === "--port") { o.port = Number(argv[++i]); }
     else if (!a.startsWith("-") && o.video === null) o.video = a;
   }
@@ -73,6 +84,49 @@ export function resolveVideo(
   return { video: picked, notice: `영상을 골랐습니다: ${picked}\n` };
 }
 
+/**
+ * 서버를 띄우지 않고 파일 한 장을 쓴다.
+ *
+ * 규격을 못 읽으면 **내보내지 않는다**. 서버 모드는 창을 열고 작성을 잠그는 선택이 가능하지만,
+ * 잠긴 채로 굳은 파일은 왜 안 되는지 알 길이 없는 껍데기가 된다.
+ */
+async function runStaticExport(opt: CliOptions, video: string): Promise<number> {
+  const storeRoot = findStoreRoot(video);
+  const { config, problems } = readProjectConfig(storeRoot);
+  const sourceKind = config.scenes && config.scenes.length > 0 ? "remotion" : "generic";
+  let info;
+  try {
+    info = await readVideoInfo(video, sourceKind);
+  } catch (e) {
+    process.stderr.write(
+      `영상 규격을 읽지 못해 내보내지 않았습니다: ${(e as Error).message}\n` +
+        `  → ffprobe 가 필요합니다. 규격 없이 만든 파일은 프레임을 확정할 수 없습니다.\n`,
+    );
+    return 1;
+  }
+  for (const p of problems) process.stderr.write(`framenote: ${p}\n`);
+
+  const result = exportStatic({
+    videoPath: video,
+    outPath: opt.out ? resolve(process.cwd(), opt.out) : defaultOutPath(video),
+    playerDir: findPlayerDir(),
+    info,
+    scenes: config.scenes ?? [],
+    previewCommand: config.previewCommand ?? null,
+    notes: readNotes(storeRoot, video),
+    storeDir: storeDirFor(storeRoot, video),
+    notesFile: notesFileFor(storeRoot, video),
+  });
+  process.stdout.write(
+    `정적 파일  ${result.out}\n` +
+      `영상       ${result.videoSrc} (같이 옮겨야 열립니다)\n` +
+      `메모       ${result.notes}건 담김${result.images ? ` · 이미지 ${result.images}장 복사` : ""}\n` +
+      `메모는 이 파일을 연 브라우저에 쌓이고, 「메모 파일로 내보내기」로 꺼내 에이전트에게 줍니다.\n`,
+  );
+  if (opt.open) openBrowser(`file://${result.out}`);
+  return 0;
+}
+
 export async function run(argv: readonly string[]): Promise<number> {
   const opt = parseCliArgs(argv);
 
@@ -84,6 +138,8 @@ export async function run(argv: readonly string[]): Promise<number> {
   }
   const video = resolved.video;
   if (resolved.notice) process.stdout.write(resolved.notice);
+
+  if (opt.static) return runStaticExport(opt, video);
 
   const handle = await startServer({
     videoPath: video,

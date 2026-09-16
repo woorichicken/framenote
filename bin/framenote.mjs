@@ -10,6 +10,8 @@ const USAGE = `framenote — 영상에 프레임 단위로 메모를 남기고 �
   framenote [<영상 파일>] [옵션]
 
 옵션
+  --static      서버를 띄우지 않고 파일 한 장(HTML)으로 내보낸다
+  --out <경로>  내보낼 파일 경로. 생략하면 영상 옆 <영상이름>.framenote.html
   --port <n>    쓸 포트를 지정한다. 생략하면 비어 있는 것을 고른다
   --no-open     브라우저를 자동으로 열지 않는다
   -h, --help    이 도움말
