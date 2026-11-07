@@ -2,6 +2,8 @@
 
 렌더된 영상에 **프레임 단위로 메모**를 남기고, 그 메모를 코딩 에이전트가 바로 받는다.
 
+사이트: https://framenote.solhun.com
+
 ```bash
 npx framenote out/final.mp4
 ```
